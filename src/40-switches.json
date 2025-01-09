@@ -1,7 +1,7 @@
 {
   "cli": true,
   "enable_log": true,
-  "p4_src": "p4src/ecmp.p4",
+  "p4_src": "p4src_simple_router/simple_router.p4",
   "pcap_dump": true,
   "topology": {
     "assignment_strategy": "l3",
