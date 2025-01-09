@@ -1,0 +1,36 @@
+{
+    "p4_src": "p4src_simple_router_loss/simple_router_loss.p4",
+    "cli": true,
+    "pcap_dump": true,
+    "enable_log": true,
+    "topology": {
+        "assignment_strategy": "l2",
+        "links": [
+            [
+                "h1",
+                "s1"
+            ],
+            [
+                "h2",
+                "s1"
+            ],
+            [
+                "h3",
+                "s1"
+            ],
+            [
+                "h4",
+                "s1"
+            ]
+        ],
+        "hosts": {
+            "h1": {},
+            "h2": {},
+            "h3": {},
+            "h4": {}
+        },
+        "switches": {
+            "s1": {}
+        }
+    }
+}
