@@ -25,3 +25,10 @@ PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
 rtt min/avg/max/mdev = 1.776/1.972/2.266/0.146 ms
 ```
 
+Le simple routeur lossy réutilise le même controlleur que le simple routeur ; l'unique différence est qu'il drop des paquets dans le CP de manière aléatoire.
+
+# stupid routeur
+
+le controlleur va renseigner au cp via un registre les ports auxquels sont connectés le switch et celui ci va choisir aléatoirement sur quel port envoyer le paquet
+
+la topologie de test est composée de 5 switchs et deux hôtes, avec deux chemins entre les deux hôtes qui n'ont pas la même longueur
