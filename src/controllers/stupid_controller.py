@@ -20,8 +20,9 @@ class StupidController(RoutingController):
         self.controller.register_write("number_of_ports", 0, number_of_ports)
         print("\nAdded ", number_of_ports, "to the register number_of_ports\n")
 
-    def main(self):
+    def main_loop(self):
         self.route()
+        
 
 
 if __name__ == "__main__":

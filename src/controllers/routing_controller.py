@@ -231,7 +231,7 @@ class RoutingController(object):
                 []
             )
 
-    def main(self):
+    def main_loop(self):
         self.route()
 
 
