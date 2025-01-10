@@ -34,9 +34,8 @@ parser MyParser(packet_in packet,
     // Skip the segments stack to reach upper layer informations to 
     // compute ECMP hash.
     state skip_segments_stack{
-        segmemnt_t buff;
-        packet.extract(buff);
-        transition select(buff.bottom) {
+        packet.extract(hdr.sourcerouting_stack.next);
+        transition select(hdr.sourcerouting_stack.last.bottom) {
             0: skip_segments_stack;
             1: parse_ipv4;
         }
@@ -66,6 +65,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
         //parsed headers have to be added again into the packet.
         packet.emit(hdr.ethernet);
         packet.emit(hdr.sourcerouting);
+        packet.emit(hdr.sourcerouting_stack);
         packet.emit(hdr.ipv4);
         packet.emit(hdr.tcp);
     }

@@ -12,6 +12,8 @@ typedef bit<32> ip4Addr_t;
 const bit<1> TYPE_SOURCEROUTING_LINK = 0;
 const bit<1> TYPE_SOURCEROUTING_SEG = 1;
 
+#define MAX_HOP 16
+
 /**
 * @brief encapsulation headers to impose intermediate nodes of passage for 
 * packets
@@ -74,6 +76,7 @@ struct metadata {
 struct headers {
     ethernet_t   ethernet;
     segmemnt_t   sourcerouting;
+    segmemnt_t[MAX_HOP] sourcerouting_stack;
     ipv4_t       ipv4;
     tcp_t        tcp;
 }

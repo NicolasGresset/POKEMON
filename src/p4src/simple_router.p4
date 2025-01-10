@@ -121,7 +121,7 @@ control MyIngress(inout headers hdr,
                 }
             }
         }
-        if (hdr.ipv4.isValid()){
+        else if (hdr.ipv4.isValid()){
             meta.ipv4_target = hdr.ipv4.dstAddr;
         }
         if(meta.ipv4_target != 0) {
