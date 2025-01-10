@@ -30,20 +30,6 @@ control MyIngress(inout headers hdr,
         mark_to_drop(standard_metadata);
     }
 
-    table ecmp_group_to_nhop {
-        key = {
-        }
-        actions = {
-        }
-    }
-
-    table ipv4_lpm {
-        key = {
-        }
-        actions = {
-        }
-    }
-
     action apply_stupid_logic(){
         bit<8> number_of_port;
         bit<32> random_port;
