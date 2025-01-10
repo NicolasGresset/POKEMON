@@ -1,2 +1,5 @@
 src/log/
 src/pcap/
+src/p4-utils/
+src/__pycache__/
+src/topology.json
