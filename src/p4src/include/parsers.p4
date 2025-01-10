@@ -18,7 +18,27 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ethernet);
         transition select(hdr.ethernet.etherType){
             TYPE_IPV4: parse_ipv4;
+            TYPE_SOURCEROUTING: parse_sourcerouting;
             default: accept;
+        }
+    }
+
+    state parse_sourcerouting{
+        packet.extract(hdr.sourcerouting);
+        transition select(hdr.sourcerouting.bottom){
+            0: skip_segments_stack;
+            1: parse_ipv4;
+        }
+    }
+
+    // Skip the segments stack to reach upper layer informations to 
+    // compute ECMP hash.
+    state skip_segments_stack{
+        segmemnt_t buff;
+        packet.extract(buff);
+        transition select(buff.bottom) {
+            0: skip_segments_stack;
+            1: parse_ipv4;
         }
     }
 
@@ -45,9 +65,8 @@ control MyDeparser(packet_out packet, in headers hdr) {
 
         //parsed headers have to be added again into the packet.
         packet.emit(hdr.ethernet);
+        packet.emit(hdr.sourcerouting);
         packet.emit(hdr.ipv4);
-
-        //Only emited if valid
         packet.emit(hdr.tcp);
     }
 }

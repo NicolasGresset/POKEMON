@@ -53,6 +53,10 @@ control MyIngress(inout headers hdr,
         //decrease ttl by 1
         hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
+    
+    action pop_segment() {
+        hdr.sourcerouting.setInvalid();
+    }
 
     table ecmp_group_to_nhop {
         key = {
@@ -68,7 +72,7 @@ control MyIngress(inout headers hdr,
 
     table ipv4_lpm {
         key = {
-            hdr.ipv4.dstAddr: lpm;
+            meta.ipv4_target: lpm;
         }
         actions = {
             set_nhop;
@@ -79,14 +83,54 @@ control MyIngress(inout headers hdr,
         default_action = drop;
     }
 
+    table sourcerouting_link {
+        key = {
+            hdr.sourcerouting.target: lpm;
+        }
+        actions = {
+            set_nhop;
+            drop;
+        }
+        size = 64;
+        default_action = drop;
+    }
+
+    table sourcerouting_penultimate_hop {
+        key = {
+            hdr.sourcerouting.target: lpm;
+        }
+        actions = {
+            pop_segment;
+            NoAction;
+        }
+        size = 64;
+        default_action = NoAction;
+    }
+
     apply {
+        meta.ipv4_target = 0;
+        if(hdr.sourcerouting.isValid()){
+            switch(hdr.sourcerouting.type){
+                TYPE_SOURCEROUTING_LINK: {
+                    sourcerouting_link.apply();
+                    pop_segment();
+                }
+                TYPE_SOURCEROUTING_SEG:{
+                    meta.ipv4_target = hdr.sourcerouting.target;
+                    sourcerouting_penultimate_hop.apply();
+                }
+            }
+        }
         if (hdr.ipv4.isValid()){
+            meta.ipv4_target = hdr.ipv4.dstAddr;
+        }
+        if(meta.ipv4_target != 0) {
             switch (ipv4_lpm.apply().action_run){
                 ecmp_group: {
                     ecmp_group_to_nhop.apply();
                 }
             }
-        }
+        } 
     }
 }
 

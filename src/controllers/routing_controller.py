@@ -26,6 +26,8 @@ class RoutingController(object):
     def set_table_defaults(self):
         self.controller.table_set_default("ipv4_lpm", "drop", [])
         self.controller.table_set_default("ecmp_group_to_nhop", "drop", [])
+        self.controller.table_set_default("sourcerouting_link", "drop", [])
+        self.controller.table_set_default("sourcerouting_penultimate_hop", "noAction", [])
 
     def route(self):
 
@@ -53,83 +55,181 @@ class RoutingController(object):
                         [str(host_mac), str(sw_port)],
                     )
 
-            # check if there are directly connected hosts to the destination
+            # add route for hosts directly connected to the destination.
+            # And to the destination loopback for sourcerouting.
             else:
-                if self.topo.get_hosts_connected_to(sw_dst):
-                    paths = self.topo.get_shortest_paths_between_nodes(self.switch_name, sw_dst)
-                    for host in self.topo.get_hosts_connected_to(sw_dst):
+                paths = self.topo.get_shortest_paths_between_nodes(self.switch_name, sw_dst)
+                if len(paths) == 1:
+                    next_hop = paths[0][1]
 
-                        if len(paths) == 1:
-                            next_hop = paths[0][1]
+                    loopback_ip = f"100.0.0.{sw_dst[1:]}/32"
+                    sw_port = self.topo.node_to_node_port_num(self.switch_name, next_hop)
+                    dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
 
-                            host_ip = self.topo.get_host_ip(host) + "/24"
-                            sw_port = self.topo.node_to_node_port_num(self.switch_name, next_hop)
-                            dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
+                    # add rule
+                    print("table_add at {}:".format(self.switch_name))
+                    self.controller.table_add(
+                        "ipv4_lpm",
+                        "set_nhop",
+                        [str(loopback_ip)],
+                        [str(dst_sw_mac), str(sw_port)],
+                    )
+                elif len(paths) > 1:
+                    next_hops = [x[1] for x in paths]
+                    dst_macs_ports = [
+                        (
+                            self.topo.node_to_node_mac(next_hop, self.switch_name),
+                            self.topo.node_to_node_port_num(self.switch_name, next_hop),
+                        )
+                        for next_hop in next_hops
+                    ]
+                    loopback_ip = f"100.0.0.{sw_dst[1:]}/32"
 
-                            # add rule
+                    # check if the ecmp group already exists. The ecmp group is defined by the number of next
+                    # ports used, thus we can use dst_macs_ports as key
+                    if switch_ecmp_groups[self.switch_name].get(
+                        tuple(dst_macs_ports), None
+                    ):
+                        ecmp_group_id = switch_ecmp_groups[self.switch_name].get(
+                            tuple(dst_macs_ports), None
+                        )
+                        print("table_add at {}:".format(self.switch_name))
+                        self.controller.table_add(
+                            "ipv4_lpm",
+                            "ecmp_group",
+                            [str(loopback_ip)],
+                            [str(ecmp_group_id), str(len(dst_macs_ports))],
+                        )
+
+                    # new ecmp group for this switch
+                    else:
+                        new_ecmp_group_id = len(switch_ecmp_groups[self.switch_name]) + 1
+                        switch_ecmp_groups[self.switch_name][
+                            tuple(dst_macs_ports)
+                        ] = new_ecmp_group_id
+
+                        # add group
+                        for i, (mac, port) in enumerate(dst_macs_ports):
+                            print("table_add at {}:".format(self.switch_name))
+                            self.controller.table_add(
+                                "ecmp_group_to_nhop",
+                                "set_nhop",
+                                [str(new_ecmp_group_id), str(i)],
+                                [str(mac), str(port)],
+                            )
+
+                        # add forwarding rule
+                        print("table_add at {}:".format(self.switch_name))
+                        self.controller.table_add(
+                            "ipv4_lpm",
+                            "ecmp_group",
+                            [str(loopback_ip)],
+                            [
+                                str(new_ecmp_group_id),
+                                str(len(dst_macs_ports)),
+                            ],
+                        )
+
+                for host in self.topo.get_hosts_connected_to(sw_dst):
+
+                    if len(paths) == 1:
+                        next_hop = paths[0][1]
+
+                        host_ip = self.topo.get_host_ip(host) + "/24"
+                        sw_port = self.topo.node_to_node_port_num(self.switch_name, next_hop)
+                        dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
+
+                        # add rule
+                        print("table_add at {}:".format(self.switch_name))
+                        self.controller.table_add(
+                            "ipv4_lpm",
+                            "set_nhop",
+                            [str(host_ip)],
+                            [str(dst_sw_mac), str(sw_port)],
+                        )
+
+                    elif len(paths) > 1:
+                        next_hops = [x[1] for x in paths]
+                        dst_macs_ports = [
+                            (
+                                self.topo.node_to_node_mac(next_hop, self.switch_name),
+                                self.topo.node_to_node_port_num(self.switch_name, next_hop),
+                            )
+                            for next_hop in next_hops
+                        ]
+                        host_ip = self.topo.get_host_ip(host) + "/24"
+
+                        # check if the ecmp group already exists. The ecmp group is defined by the number of next
+                        # ports used, thus we can use dst_macs_ports as key
+                        if switch_ecmp_groups[self.switch_name].get(
+                            tuple(dst_macs_ports), None
+                        ):
+                            ecmp_group_id = switch_ecmp_groups[self.switch_name].get(
+                                tuple(dst_macs_ports), None
+                            )
                             print("table_add at {}:".format(self.switch_name))
                             self.controller.table_add(
                                 "ipv4_lpm",
-                                "set_nhop",
+                                "ecmp_group",
                                 [str(host_ip)],
-                                [str(dst_sw_mac), str(sw_port)],
+                                [str(ecmp_group_id), str(len(dst_macs_ports))],
                             )
 
-                        elif len(paths) > 1:
-                            next_hops = [x[1] for x in paths]
-                            dst_macs_ports = [
-                                (
-                                    self.topo.node_to_node_mac(next_hop, self.switch_name),
-                                    self.topo.node_to_node_port_num(self.switch_name, next_hop),
-                                )
-                                for next_hop in next_hops
-                            ]
-                            host_ip = self.topo.get_host_ip(host) + "/24"
+                        # new ecmp group for this switch
+                        else:
+                            new_ecmp_group_id = len(switch_ecmp_groups[self.switch_name]) + 1
+                            switch_ecmp_groups[self.switch_name][
+                                tuple(dst_macs_ports)
+                            ] = new_ecmp_group_id
 
-                            # check if the ecmp group already exists. The ecmp group is defined by the number of next
-                            # ports used, thus we can use dst_macs_ports as key
-                            if switch_ecmp_groups[self.switch_name].get(
-                                tuple(dst_macs_ports), None
-                            ):
-                                ecmp_group_id = switch_ecmp_groups[self.switch_name].get(
-                                    tuple(dst_macs_ports), None
-                                )
+                            # add group
+                            for i, (mac, port) in enumerate(dst_macs_ports):
                                 print("table_add at {}:".format(self.switch_name))
                                 self.controller.table_add(
-                                    "ipv4_lpm",
-                                    "ecmp_group",
-                                    [str(host_ip)],
-                                    [str(ecmp_group_id), str(len(dst_macs_ports))],
+                                    "ecmp_group_to_nhop",
+                                    "set_nhop",
+                                    [str(new_ecmp_group_id), str(i)],
+                                    [str(mac), str(port)],
                                 )
 
-                            # new ecmp group for this switch
-                            else:
-                                new_ecmp_group_id = len(switch_ecmp_groups[self.switch_name]) + 1
-                                switch_ecmp_groups[self.switch_name][
-                                    tuple(dst_macs_ports)
-                                ] = new_ecmp_group_id
+                            # add forwarding rule
+                            print("table_add at {}:".format(self.switch_name))
+                            self.controller.table_add(
+                                "ipv4_lpm",
+                                "ecmp_group",
+                                [str(host_ip)],
+                                [
+                                    str(new_ecmp_group_id),
+                                    str(len(dst_macs_ports)),
+                                ],
+                            )
+            
 
-                                # add group
-                                for i, (mac, port) in enumerate(dst_macs_ports):
-                                    print("table_add at {}:".format(self.switch_name))
-                                    self.controller.table_add(
-                                        "ecmp_group_to_nhop",
-                                        "set_nhop",
-                                        [str(new_ecmp_group_id), str(i)],
-                                        [str(mac), str(port)],
-                                    )
+    def sourcerouting(self):
+        # Add an entry in both tables for each directly connected 
+        for neighbor in self.topo.get_neighbors(self.switch_name):
+            if(not self.topo.isSwitch(neighbor)):
+                continue
+            
+            neighbor_ip = f"100.0.0.{neighbor[1:]}/32"
+            neighbor_mac = self.topo.node_to_node_mac(self.switch_name, neighbor)
+            neighbor_port = self.topo.node_to_node_port_num(neighbor, self.switch_name) 
 
-                                # add forwarding rule
-                                print("table_add at {}:".format(self.switch_name))
-                                self.controller.table_add(
-                                    "ipv4_lpm",
-                                    "ecmp_group",
-                                    [str(host_ip)],
-                                    [
-                                        str(new_ecmp_group_id),
-                                        str(len(dst_macs_ports)),
-                                    ],
-                                )
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "sourcerouting_link",
+                "set_nhop",
+                [str(neighbor_ip)],
+                [str(neighbor_mac), str(neighbor_port)]
+            )
+
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "sourcerouting_penultimate_hop",
+                "pop_segment",
+                [str(neighbor_ip)],
+                []
+            )
 
     def main(self):
         self.route()

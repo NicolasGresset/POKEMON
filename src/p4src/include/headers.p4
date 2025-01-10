@@ -3,11 +3,25 @@
 *************************************************************************/
 
 const bit<16> TYPE_IPV4 = 0x800;
+const bit<16> TYPE_SOURCEROUTING = 0x8849;
 
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
+const bit<1> TYPE_SOURCEROUTING_LINK = 0;
+const bit<1> TYPE_SOURCEROUTING_SEG = 1;
+
+/**
+* @brief encapsulation headers to impose intermediate nodes of passage for 
+* packets
+**/
+header segmemnt_t{
+    ip4Addr_t target;
+    bit<1> type;
+    bit<1> bottom;
+    bit<6> exp;
+}
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -52,12 +66,14 @@ header tcp_t{
 }
 
 struct metadata {
+    ip4Addr_t ipv4_target;
     bit<14> ecmp_hash;
     bit<14> ecmp_group_id;
 }
 
 struct headers {
     ethernet_t   ethernet;
+    segmemnt_t   sourcerouting;
     ipv4_t       ipv4;
     tcp_t        tcp;
 }
