@@ -66,26 +66,33 @@ class MetaController(cmd.Cmd):
             dico = json.loads(self.lossy_rates[sw_name])
             print(f"Rates of {sw_name} : ")
             for sw_dst, tuples in dico.items():
-                ratio = tuples[1] / tuples[0]
+                ratio = tuples[1] / tuples[0] if tuples[0] != 0 else 0
                 print(f"{'dest':<15}{'outgoing':<15}{'ingoing':<15}{'ratio':<15}")
                 print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
+            print("")
 
     def ask_sonde(self, sonde_kind):
         for sw_name, controller in self.controllers.items():
+            print("Sending a request to", sw_name)
             self.queues_from_meta[sw_name].put(sonde_kind)
 
         for sw_name, controller in self.controllers.items():
             if sonde_kind == self.ask_lossy_rate_message:
+                print("Trying to receive the response from", sw_name)
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
-                self.display_lossy_rates(sw_name)
             elif sonde_kind == self.ask_shortest_path_stats:
                 print("Not implemented yet")
+        self.display_lossy_rates(sw_name)
 
     def do_exit(self, arg):
         """Exit the shell"""
 
         print("Goodbye!")
         return True
+    
+    def emptyline(self):
+        # Overriding emptyline to do nothing when Enter is pressed
+        pass
 
 
 def get_switches_from_topo(config_path: str):
@@ -99,6 +106,7 @@ def get_switches_from_topo(config_path: str):
 
 def main(config_path: str):
     switches = get_switches_from_topo(config_path)
+    print("-------------------------------------------\n", switches)
 
     threads = []
 
@@ -106,10 +114,12 @@ def main(config_path: str):
     queues_to_meta = {}
 
     for switch, details in switches.items():
+        print("\n---------------------------------------------------------------------")
+        print("Starting a thread for", switch)
         p4_file = details.get("p4_src")
         queues_from_meta[switch] = queue.Queue()
         queues_to_meta[switch] = queue.Queue()
-        if p4_file == "p4src/routing_router.p4":
+        if p4_file == "p4src/simple_router.p4":
             thread = threading.Thread(
                 target=lambda: RoutingController(
                     switch, queues_from_meta[switch], queues_to_meta[switch]
@@ -137,6 +147,7 @@ def main(config_path: str):
             )
             sys.exit(1)
         threads.append(thread)
+        thread.start()
 
     meta_controller_thread = threading.Thread(
         target=lambda: MetaController(queues_from_meta, queues_to_meta).cmdloop(
@@ -144,9 +155,7 @@ def main(config_path: str):
         )
     )
     threads.append(meta_controller_thread)
-
-    for thread in threads:
-        thread.start()
+    meta_controller_thread.start()
 
     for thread in threads:
         thread.join()

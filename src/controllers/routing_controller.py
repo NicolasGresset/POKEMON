@@ -2,6 +2,38 @@ from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 import sys
 import json
+from scapy.all import Packet, BitField, IPField, bind_layers
+from scapy.layers.inet import IP
+
+
+class ProbeHeader(Packet):
+    name = "ProbeHeader"
+    fields_desc = [
+        IPField("origin", "0.0.0.0"),  # origin as IPv4
+        IPField("target", "0.0.0.0"),  # target as IPv4
+        BitField("fresh", 0, 1),  # fresh as a 1-bit field
+        BitField("hit", 0, 1),  # hit as a 1-bit field
+        BitField("recording", 0, 1),  # recording as a 1-bit field
+        BitField("empty_record", 0, 1),  # empty_record as a 1-bit field
+        BitField("exp", 0, 4),  # experimental as a 4-bit field
+    ]
+
+
+class SegmentHeader(Packet):
+    name = "SegmentHeader"
+    fields_desc = [
+        IPField("target", "0.0.0.0"),  # IPv4 address field
+        BitField("type", 0, 1),  # 1-bit field for 'type'
+        BitField("bottom", 0, 1),  # 1-bit field for 'bottom'
+        BitField("exp", 0, 6),  # 6-bit field for 'exp'
+    ]
+
+    # Define the behavior to guess the next layer
+    def guess_payload_class(self, payload):
+        # If 'bottom' bit is set, there is no more header to parse
+        if self.bottom == 1:
+            return Raw  # No more headers, treat remaining as Raw data
+        return SegmentHeader  # Otherwise, parse the next header as SegmentHeader
 
 
 class RoutingController(object):
@@ -17,6 +49,10 @@ class RoutingController(object):
         self.init()
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
+
+        self.controller_cpu_port = self.topo.get_ctl_cpu_intf(
+            self.switch_name
+        )  # port to send packets to the dataplane
 
     def init(self):
         self.connect_to_switch()
@@ -276,21 +312,25 @@ class RoutingController(object):
 
     def fetch_probe_counters(self):
         for sw, index in self.counters_indexes.items():
-            self.lossy_probes[sw][0] = self.controller.counter_read(
-                "outgoing_probes", index
-            )[1]
-            self.lossy_probes[sw][1] = self.controller.counter_read(
-                "incoming_probes", index
-            )[1]
+            self.lossy_probes[sw] = (
+                self.controller.counter_read("outgoing_probes", index)[1],
+                self.controller.counter_read("incoming_probes", index)[1],
+            )
+
+    def send_probe(self):
+        pass
 
     def lossy_rate_callback(self):
+        print(self.switch_name, ": entering callback")
         self.fetch_probe_counters()
+        print(self.switch_name, ": Couter succesfully fetched :", self.lossy_probes)
         self.queue_to_meta.put(json.dumps(self.lossy_probes))
 
     def shortest_path_callback(self):
         pass
 
     def main_loop(self):
+        print(f"({self.switch_name}) : entering main loop")
         while True:
             received_order = self.queue_from_meta.get()
             if received_order == "LOSSY_RATE":
