@@ -19,6 +19,11 @@ class MetaController(cmd.Cmd):
         self.queues_from_meta = queues_from_meta
         self.queues_to_meta = queues_to_meta
 
+        self.lossy_rates = {}
+
+        self.ask_lossy_rate_message = "LOSSY_RATE"
+        self.ask_shortest_path_stats = "SHORTEST_PATH"
+
         self.init()
 
     def init(self):
@@ -48,24 +53,33 @@ class MetaController(cmd.Cmd):
             thrift_port = self.topo.get_thrift_port(p4switch)
             self.controllers[p4switch] = SimpleSwitchThriftAPI(thrift_port)
 
-    def do_send_sonde(self, args):
-        """Send a sonde with the given identifier"""
-        try:
-            arg_list = args.split()
-            if len(arg_list) != 2:
-                print("Error: send_sonde requires exactly 2 arguments.")
-                return
+    def do_ask_lossy_rates(self, args):
+        """Ask all controllers to publish their stats about losses"""
+        self.ask_sonde(self.ask_lossy_rate_message)
 
-            identifier, message = arg_list
+    def do_ask_shortest_paths_stats(self, args):
+        """Ask all controllers to publish their stats about shortest path stats"""
+        self.ask_sonde(self.ask_shortest_path_stats)
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-        self.send_sonde(identifier, message)
+    def display_lossy_rates(self, sw_name):
+        for sw_name, controller in self.controllers.items():
+            dico = json.loads(self.lossy_rates[sw_name])
+            print(f"Rates of {sw_name} : ")
+            for sw_dst, tuples in dico.items():
+                ratio = tuples[1] / tuples[0]
+                print(f"{'dest':<15}{'outgoing':<15}{'ingoing':<15}{'ratio':<15}")
+                print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
 
-    def send_sonde(self, identifier, message):
-        self.queues_from_meta[identifier].put(message)
-        received_msg = self.queues_to_meta[identifier].get()
-        print("(meta-controller) received response : ", received_msg)
+    def ask_sonde(self, sonde_kind):
+        for sw_name, controller in self.controllers.items():
+            self.queues_from_meta[sw_name].put(sonde_kind)
+
+        for sw_name, controller in self.controllers.items():
+            if sonde_kind == self.ask_lossy_rate_message:
+                self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
+                self.display_lossy_rates(sw_name)
+            elif sonde_kind == self.ask_shortest_path_stats:
+                print("Not implemented yet")
 
     def do_exit(self, arg):
         """Exit the shell"""

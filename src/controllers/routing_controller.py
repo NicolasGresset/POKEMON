@@ -1,6 +1,7 @@
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 import sys
+import json
 
 
 class RoutingController(object):
@@ -10,8 +11,9 @@ class RoutingController(object):
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
         self.counters_indexes = {}
-        self.outgoing_probes = {}
-        self.incoming_probes = {}
+        self.lossy_probes = (
+            {}
+        )  # key: switch connected to the dp, value : tuple(outgoing_probes, incoming_probes)
         self.init()
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
@@ -274,49 +276,33 @@ class RoutingController(object):
 
     def fetch_probe_counters(self):
         for sw, index in self.counters_indexes.items():
-            self.outgoing_probes[sw] = self.controller.counter_read(
+            self.lossy_probes[sw][0] = self.controller.counter_read(
                 "outgoing_probes", index
             )[1]
-            self.outgoing_probes[sw] = self.controller.counter_read(
+            self.lossy_probes[sw][1] = self.controller.counter_read(
                 "incoming_probes", index
             )[1]
 
-    def probe_setup(self):
-        # Add add an entry for each router in topo in both table
-        index = 0
-        for sw in self.topo.get_p4switches():
-            if sw == self.switch_name:
-                continue
+    def lossy_rate_callback(self):
+        self.fetch_probe_counters()
+        self.lossy_probes["s1"] = (4, 3)
+        self.queue_to_meta.put(json.dumps(self.lossy_probes))
 
-            sw_id = f"100.0.0.{sw[1:]}"
-            self.counters_indexes[sw_id] = index
-            index += 1
-
-            print("table_add at {}:".format(self.switch_name))
-            self.controller.table_add(
-                "count_outgoing_probes", "NoAction", [str(sw_id)], []
-            )
-
-            print("table_add at {}:".format(self.switch_name))
-            self.controller.table_add(
-                "count_incoming_probes", "NoAction", [str(sw_id)], []
-            )
-
-    def fetch_probe_counters(self):
-        for sw, index in self.counters_indexes.items():
-            self.outgoing_probes[sw] = self.controller.counter_read(
-                "outgoing_probes", index
-            )[1]
-            self.outgoing_probes[sw] = self.controller.counter_read(
-                "incoming_probes", index
-            )[1]
+    def shortest_path_callback(self):
+        pass
 
     def main_loop(self):
         while True:
             received_order = self.queue_from_meta.get()
-            print(f"({self.switch_name}) received_order : {received_order}")
-            if True:
-                self.queue_to_meta.put("I will execute that order")
+            if received_order == "LOSSY_RATE":
+                self.lossy_rate_callback()
+            elif received_order == "SHORTEST_PATH":
+                self.shortest_path_callback()
+            else:
+                print(
+                    "Error: received unexpected order from meta-controller : ",
+                    received_order,
+                )
 
 
 if __name__ == "__main__":
