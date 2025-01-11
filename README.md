@@ -33,3 +33,18 @@ docker exec -it p4 bash
 ```bash
 python3 routing-controller.py
 ```
+
+# code style
+
+for improving consistencies in formatting, use black to ensure formatting before each commit :
+
+```bash
+sudo pacman -Syu python-black python-pre-commit
+```
+
+do
+```bash
+black .
+```
+
+before each commit
