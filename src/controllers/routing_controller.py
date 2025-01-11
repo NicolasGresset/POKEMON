@@ -21,6 +21,8 @@ class RoutingController(object):
         self.reset_state()
         self.set_table_defaults()
         self.route()
+        self.sourcerouting()
+        self.probe_setup()
 
     def reset_state(self):
         self.controller.reset_state()
@@ -310,9 +312,6 @@ class RoutingController(object):
             )[1]
 
     def main_loop(self):
-        self.sourcerouting()
-        self.probe_setup()
-        self.route()
         while True:
             received_order = self.queue_from_meta.get()
             print(f"({self.switch_name}) received_order : {received_order}")
