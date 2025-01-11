@@ -9,6 +9,9 @@ class RoutingController(object):
 
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
+        self.counters_indexes = {}
+        self.outgoing_probes = {}
+        self.incoming_probes = {}
         self.init()
 
     def init(self):
@@ -27,7 +30,9 @@ class RoutingController(object):
         self.controller.table_set_default("ipv4_lpm", "drop", [])
         self.controller.table_set_default("ecmp_group_to_nhop", "drop", [])
         self.controller.table_set_default("sourcerouting_link", "drop", [])
-        self.controller.table_set_default("sourcerouting_penultimate_hop", "noAction", [])
+        self.controller.table_set_default("sourcerouting_penultimate_hop", "NoAction", [])
+        self.controller.table_set_default("count_outgoing_probes", "NoAction", [])
+        self.controller.table_set_default("count_incoming_probes", "NoAction", [])
 
     def route(self):
 
@@ -231,10 +236,45 @@ class RoutingController(object):
                 []
             )
 
+    def probe_setup(self):
+        # Add add an entry for each router in topo in both table
+        index = 0
+        for sw in self.topo.get_p4switches():
+            if(sw == self.switch_name):
+                continue
+
+            sw_id = f"100.0.0.{sw[1:]}"
+            self.counters_indexes[sw_id] = index;
+            index+=1
+
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "count_outgoing_probes",
+                "NoAction",
+                [str(sw_id)],
+                []
+            )
+
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "count_incoming_probes",
+                "NoAction",
+                [str(sw_id)],
+                []
+            )
+
+    def fetch_probe_counters(self):
+        for sw, index in self.counters_indexes.items():
+            self.outgoing_probes[sw] = self.controller.counter_read("outgoing_probes", index)[1]
+            self.outgoing_probes[sw] = self.controller.counter_read("incoming_probes", index)[1]
+
+
     def main_loop(self):
         self.route()
+        self.sourcerouting()
+        self.probe_setup()
 
 
 if __name__ == "__main__":
     switch = sys.argv[1]
-    controller = RoutingController(switch).main()
+    controller = RoutingController(switch).main_loop()

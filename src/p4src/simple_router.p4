@@ -21,6 +21,8 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 control MyIngress(inout headers hdr,
                   inout metadata meta,
                   inout standard_metadata_t standard_metadata) {
+    register<ip4Addr_t>(1) probe_id;
+
     action drop() {
         mark_to_drop(standard_metadata);
     }
@@ -56,6 +58,21 @@ control MyIngress(inout headers hdr,
     
     action pop_segment() {
         hdr.sourcerouting.setInvalid();
+    }
+
+    action record() {
+        hdr.records.push_front(1);
+        hdr.records[MAX_HOP - 1].bottom = 1;
+
+
+        hdr.records[0].setValid();
+        hdr.records[0].id = meta.probe_id;
+        if(hdr.probe.empty_record == 1) {
+            hdr.probe.empty_record = 0;
+            hdr.records[0].bottom = 1;
+        }
+        else
+            hdr.records[0].bottom = 0;
     }
 
     table ecmp_group_to_nhop {
@@ -107,6 +124,33 @@ control MyIngress(inout headers hdr,
         default_action = NoAction;
     }
 
+    direct_counter(CounterType.packets) outgoing_probes;
+    direct_counter(CounterType.packets) incoming_probes;
+    
+    table count_outgoing_probes{
+        key = {
+            hdr.probe.target: exact;
+        }
+        actions = {
+            NoAction;
+        }
+        size = 64;
+        counters = outgoing_probes;
+        default_action = NoAction;
+    }
+
+    table count_incoming_probes{
+        key = {
+            hdr.probe.target: exact;
+        }
+        actions = {
+            NoAction;
+        }
+        size = 64;
+        counters = incoming_probes;
+        default_action = NoAction;
+    }
+
     apply {
         meta.ipv4_target = 0;
         if(hdr.sourcerouting.isValid()){
@@ -131,6 +175,25 @@ control MyIngress(inout headers hdr,
                 }
             }
         } 
+
+        if(hdr.probe.isValid()){
+            probe_id.read(meta.probe_id, 0);
+
+            if(meta.probe_id == hdr.probe.origin) {
+                if(hdr.probe.fresh == 1){
+                    hdr.probe.fresh = 0;
+                    count_outgoing_probes.apply();
+                }
+                else {
+                    count_incoming_probes.apply();
+                }
+            }
+            if(meta.probe_id == hdr.probe.target)
+                hdr.probe.hit = 1;
+
+            if(hdr.probe.recording == 1)
+                record();
+        }
     }
 }
 

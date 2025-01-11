@@ -45,7 +45,26 @@ parser MyParser(packet_in packet,
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol){
             6 : parse_tcp;
+            IP_PROTO_PROBE: parse_probe;
             default: accept;
+        }
+    }
+
+    state parse_probe {
+        packet.extract(hdr.probe);
+        transition select(hdr.probe.recording, hdr.probe.empty_record) {
+            (0, 0): accept;
+            (0, 1): accept;
+            (1, 0): parse_record;
+            (1, 1): accept;
+        }
+    }
+
+    state parse_record{
+        packet.extract(hdr.records.next);
+        transition select(hdr.records.last.bottom){
+            0: parse_record;
+            1: accept;
         }
     }
 
@@ -67,6 +86,8 @@ control MyDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.sourcerouting);
         packet.emit(hdr.sourcerouting_stack);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.probe);
+        packet.emit(hdr.records);
         packet.emit(hdr.tcp);
     }
 }

@@ -5,6 +5,8 @@
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<16> TYPE_SOURCEROUTING = 0x8849;
 
+const bit<8> IP_PROTO_PROBE = 0xfd;
+
 typedef bit<9>  egressSpec_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
@@ -23,6 +25,28 @@ header segmemnt_t{
     bit<1> type;
     bit<1> bottom;
     bit<6> exp;
+}
+
+/**
+* @brief Probe header
+**/
+header probe_t{
+    ip4Addr_t origin;
+    ip4Addr_t target;
+    bit<1> fresh;
+    bit<1> hit;
+    bit<1> recording;
+    bit<1> empty_record;
+    bit<4> exp;
+}
+
+/**
+* @brief Record header for one hop
+**/
+header record_t{
+    ip4Addr_t id;
+    bit<1> bottom;
+    bit<7> exp;
 }
 
 header ethernet_t {
@@ -68,6 +92,7 @@ header tcp_t{
 }
 
 struct metadata {
+    ip4Addr_t probe_id;
     ip4Addr_t ipv4_target;
     bit<14> ecmp_hash;
     bit<14> ecmp_group_id;
@@ -78,6 +103,8 @@ struct headers {
     segmemnt_t   sourcerouting;
     segmemnt_t[MAX_HOP] sourcerouting_stack;
     ipv4_t       ipv4;
+    probe_t      probe;
+    record_t[MAX_HOP] records;
     tcp_t        tcp;
 }
 
