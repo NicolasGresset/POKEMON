@@ -75,6 +75,31 @@ control MyIngress(inout headers hdr,
             hdr.records[0].bottom = 0;
     }
 
+
+#ifdef LOSSY_ROUTER
+    action lossy_logic(){
+        bit<32> random_value;
+        random(random_value, (bit<32>)1, (bit<32>)100);
+        if (random_value <= 30){
+            standard_metadata.egress_spec = DROP_PORT;
+        }
+    }
+#endif
+
+#ifdef STUPID_ROUTER
+    register<bit<8>>(1) number_of_ports;
+
+    action stupid_logic(){
+        bit<8> number_of_port;
+        bit<32> random_port;
+
+        number_of_ports.read(number_of_port, (bit<32>) 0);
+        random(random_port, (bit<32>)1, (bit<32>)number_of_port);
+
+        standard_metadata.egress_spec = (bit<9>)(random_port);
+    }
+#endif
+
     table ecmp_group_to_nhop {
         key = {
             meta.ecmp_group_id:    exact;
@@ -174,6 +199,10 @@ control MyIngress(inout headers hdr,
                     ecmp_group_to_nhop.apply();
                 }
             }
+
+#ifdef STUPID_ROUTER
+            stupid_logic();
+#endif
         } 
 
         if(hdr.probe.isValid()){
@@ -194,6 +223,10 @@ control MyIngress(inout headers hdr,
             if(hdr.probe.recording == 1)
                 record();
         }
+
+#ifdef LOSSY_ROUTER
+        lossy_logic();
+#endif
     }
 }
 
