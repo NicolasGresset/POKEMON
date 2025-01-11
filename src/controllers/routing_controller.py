@@ -5,7 +5,7 @@ import sys
 
 class RoutingController(object):
 
-    def __init__(self, switch_name):
+    def __init__(self, switch_name: str, queue_from_meta, queue_to_meta):
 
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
@@ -13,11 +13,14 @@ class RoutingController(object):
         self.outgoing_probes = {}
         self.incoming_probes = {}
         self.init()
+        self.queue_from_meta = queue_from_meta
+        self.queue_to_meta = queue_to_meta
 
     def init(self):
         self.connect_to_switch()
         self.reset_state()
         self.set_table_defaults()
+        self.route()
 
     def reset_state(self):
         self.controller.reset_state()
@@ -36,9 +39,7 @@ class RoutingController(object):
 
     def route(self):
 
-        switch_ecmp_groups = {
-            self.switch_name: {} 
-        }
+        switch_ecmp_groups = {self.switch_name: {}}
 
         # sw_name = nom du switch d'intérêt
         # controller = nom du controlleur associé à ce switch
@@ -63,12 +64,16 @@ class RoutingController(object):
             # add route for hosts directly connected to the destination.
             # And to the destination loopback for sourcerouting.
             else:
-                paths = self.topo.get_shortest_paths_between_nodes(self.switch_name, sw_dst)
+                paths = self.topo.get_shortest_paths_between_nodes(
+                    self.switch_name, sw_dst
+                )
                 if len(paths) == 1:
                     next_hop = paths[0][1]
 
                     loopback_ip = f"100.0.0.{sw_dst[1:]}/32"
-                    sw_port = self.topo.node_to_node_port_num(self.switch_name, next_hop)
+                    sw_port = self.topo.node_to_node_port_num(
+                        self.switch_name, next_hop
+                    )
                     dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
 
                     # add rule
@@ -108,7 +113,9 @@ class RoutingController(object):
 
                     # new ecmp group for this switch
                     else:
-                        new_ecmp_group_id = len(switch_ecmp_groups[self.switch_name]) + 1
+                        new_ecmp_group_id = (
+                            len(switch_ecmp_groups[self.switch_name]) + 1
+                        )
                         switch_ecmp_groups[self.switch_name][
                             tuple(dst_macs_ports)
                         ] = new_ecmp_group_id
@@ -141,8 +148,12 @@ class RoutingController(object):
                         next_hop = paths[0][1]
 
                         host_ip = self.topo.get_host_ip(host) + "/24"
-                        sw_port = self.topo.node_to_node_port_num(self.switch_name, next_hop)
-                        dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
+                        sw_port = self.topo.node_to_node_port_num(
+                            self.switch_name, next_hop
+                        )
+                        dst_sw_mac = self.topo.node_to_node_mac(
+                            next_hop, self.switch_name
+                        )
 
                         # add rule
                         print("table_add at {}:".format(self.switch_name))
@@ -158,7 +169,9 @@ class RoutingController(object):
                         dst_macs_ports = [
                             (
                                 self.topo.node_to_node_mac(next_hop, self.switch_name),
-                                self.topo.node_to_node_port_num(self.switch_name, next_hop),
+                                self.topo.node_to_node_port_num(
+                                    self.switch_name, next_hop
+                                ),
                             )
                             for next_hop in next_hops
                         ]
@@ -182,7 +195,9 @@ class RoutingController(object):
 
                         # new ecmp group for this switch
                         else:
-                            new_ecmp_group_id = len(switch_ecmp_groups[self.switch_name]) + 1
+                            new_ecmp_group_id = (
+                                len(switch_ecmp_groups[self.switch_name]) + 1
+                            )
                             switch_ecmp_groups[self.switch_name][
                                 tuple(dst_macs_ports)
                             ] = new_ecmp_group_id
@@ -208,32 +223,28 @@ class RoutingController(object):
                                     str(len(dst_macs_ports)),
                                 ],
                             )
-            
 
     def sourcerouting(self):
-        # Add an entry in both tables for each directly connected 
+        # Add an entry in both tables for each directly connected
         for neighbor in self.topo.get_neighbors(self.switch_name):
-            if(not self.topo.isSwitch(neighbor)):
+            if not self.topo.isSwitch(neighbor):
                 continue
-            
+
             neighbor_ip = f"100.0.0.{neighbor[1:]}/32"
             neighbor_mac = self.topo.node_to_node_mac(self.switch_name, neighbor)
-            neighbor_port = self.topo.node_to_node_port_num(neighbor, self.switch_name) 
+            neighbor_port = self.topo.node_to_node_port_num(neighbor, self.switch_name)
 
             print("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
                 "sourcerouting_link",
                 "set_nhop",
                 [str(neighbor_ip)],
-                [str(neighbor_mac), str(neighbor_port)]
+                [str(neighbor_mac), str(neighbor_port)],
             )
 
             print("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
-                "sourcerouting_penultimate_hop",
-                "pop_segment",
-                [str(neighbor_ip)],
-                []
+                "sourcerouting_penultimate_hop", "pop_segment", [str(neighbor_ip)], []
             )
 
     def probe_setup(self):
@@ -269,10 +280,48 @@ class RoutingController(object):
             self.outgoing_probes[sw] = self.controller.counter_read("incoming_probes", index)[1]
 
 
+    def probe_setup(self):
+        # Add add an entry for each router in topo in both table
+        index = 0
+        for sw in self.topo.get_p4switches():
+            if(sw == self.switch_name):
+                continue
+
+            sw_id = f"100.0.0.{sw[1:]}"
+            self.counters_indexes[sw_id] = index;
+            index+=1
+
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "count_outgoing_probes",
+                "NoAction",
+                [str(sw_id)],
+                []
+            )
+
+            print("table_add at {}:".format(self.switch_name))
+            self.controller.table_add(
+                "count_incoming_probes",
+                "NoAction",
+                [str(sw_id)],
+                []
+            )
+
+    def fetch_probe_counters(self):
+        for sw, index in self.counters_indexes.items():
+            self.outgoing_probes[sw] = self.controller.counter_read("outgoing_probes", index)[1]
+            self.outgoing_probes[sw] = self.controller.counter_read("incoming_probes", index)[1]
+
+
     def main_loop(self):
-        self.route()
         self.sourcerouting()
         self.probe_setup()
+        self.route()
+        while True:
+            received_order = self.queue_from_meta.get()
+            print(f"({self.switch_name}) received_order : {received_order}")
+            if True:
+                self.queue_to_meta.put("I will execute that order")
 
 
 if __name__ == "__main__":

@@ -6,8 +6,8 @@ import sys
 
 class StupidController(RoutingController):
 
-    def __init__(self, switch_name):
-        super().__init__(switch_name)
+    def __init__(self, switch_name, queue_from_meta, queue_to_meta):
+        super().__init__(switch_name, queue_from_meta, queue_to_meta)
 
     def init(self):
         self.connect_to_switch()
@@ -19,10 +19,6 @@ class StupidController(RoutingController):
         number_of_ports: int = len(self.topo.get_interfaces_to_node(self.switch_name))
         self.controller.register_write("number_of_ports", 0, number_of_ports)
         print("\nAdded ", number_of_ports, "to the register number_of_ports\n")
-
-    def main_loop(self):
-        self.route()
-        
 
 
 if __name__ == "__main__":

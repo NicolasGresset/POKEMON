@@ -11,11 +11,13 @@ import cmd
 
 class MetaController(cmd.Cmd):
 
-    def __init__(self):
+    def __init__(self, queues_from_meta, queues_to_meta):
         super().__init__()
-        self.prompt = ">"
+        self.prompt = ">>>"
         self.topo = load_topo("topology.json")
         self.controllers = {}
+        self.queues_from_meta = queues_from_meta
+        self.queues_to_meta = queues_to_meta
 
         self.init()
 
@@ -46,12 +48,24 @@ class MetaController(cmd.Cmd):
             thrift_port = self.topo.get_thrift_port(p4switch)
             self.controllers[p4switch] = SimpleSwitchThriftAPI(thrift_port)
 
-    def do_send_sonde(self, arg):
+    def do_send_sonde(self, args):
         """Send a sonde with the given identifier"""
-        self.send_sonde(arg)
+        try:
+            arg_list = args.split()
+            if len(arg_list) != 2:
+                print("Error: send_sonde requires exactly 2 arguments.")
+                return
 
-    def send_sonde(self, identifier):
-        print(f"Sending sonde: {identifier}")
+            identifier, message = arg_list
+
+        except Exception as e:
+            print(f"An error occurred: {e}")
+        self.send_sonde(identifier, message)
+
+    def send_sonde(self, identifier, message):
+        self.queues_from_meta[identifier].put(message)
+        received_msg = self.queues_to_meta[identifier].get()
+        print("(meta-controller) received response : ", received_msg)
 
     def do_exit(self, arg):
         """Exit the shell"""
@@ -74,21 +88,32 @@ def main(config_path: str):
 
     threads = []
 
+    queues_from_meta = {}
+    queues_to_meta = {}
+
     for switch, details in switches.items():
         p4_file = details.get("p4_src")
+        queues_from_meta[switch] = queue.Queue()
+        queues_to_meta[switch] = queue.Queue()
         if p4_file == "p4src/routing_router.p4":
             thread = threading.Thread(
-                target=lambda: RoutingController(switch).main_loop()
+                target=lambda: RoutingController(
+                    switch, queues_from_meta[switch], queues_to_meta[switch]
+                ).main_loop()
             )
             print("Starting normal controller")
         elif p4_file == "p4src/simple_router_stupid.p4":
             thread = threading.Thread(
-                target=lambda: StupidController(switch).main_loop()
+                target=lambda: StupidController(
+                    switch, queues_from_meta[switch], queues_to_meta[switch]
+                ).main_loop()
             )
             print("Starting stupid controller")
         elif p4_file == "p4src/simple_router_loss.p4":
             thread = threading.Thread(
-                target=lambda: RoutingController(switch).main_loop()
+                target=lambda: RoutingController(
+                    switch, queues_from_meta[switch], queues_to_meta[switch]
+                ).main_loop()
             )
             print("Starting lossy controller")
         else:
@@ -97,11 +122,10 @@ def main(config_path: str):
                 p4_file,
             )
             sys.exit(1)
-
         threads.append(thread)
 
     meta_controller_thread = threading.Thread(
-        target=lambda: MetaController().cmdloop(
+        target=lambda: MetaController(queues_from_meta, queues_to_meta).cmdloop(
             "Welcome to the meta controller shell. Type 'help' for commands."
         )
     )
@@ -117,8 +141,9 @@ def main(config_path: str):
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(
-            "Usage: python3 ",
+            "Usage: python3",
             sys.argv[0],
-            " topo.json",
+            "topo.json",
         )
+        sys.exit(1)
     main(sys.argv[1])
