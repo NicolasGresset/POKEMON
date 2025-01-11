@@ -5,3 +5,4 @@ src/p4-utils/
 src/topology.json
 **/*.p4i
 src/p4src/*.json
+.vscode/

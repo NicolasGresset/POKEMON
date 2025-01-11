@@ -67,7 +67,7 @@ class MetaController(cmd.Cmd):
             print(f"Rates of {sw_name} : ")
             for sw_dst, tuples in dico.items():
                 ratio = tuples[1] / tuples[0] if tuples[0] != 0 else 0
-                print(f"{'dest':<15}{'outgoing':<15}{'ingoing':<15}{'ratio':<15}")
+                print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
                 print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
             print("")
 

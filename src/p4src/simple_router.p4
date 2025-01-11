@@ -176,18 +176,18 @@ control MyIngress(inout headers hdr,
         default_action = NoAction;
     }
 
+    register<bit<32>>(1) register_debug;
     apply {
         meta.ipv4_target = 0;
         if(hdr.sourcerouting.isValid()){
-            switch(hdr.sourcerouting.type){
-                TYPE_SOURCEROUTING_LINK: {
+            register_debug.write(0, hdr.sourcerouting.target);
+            if (hdr.sourcerouting.type == TYPE_SOURCEROUTING_LINK){
                     sourcerouting_link.apply();
                     pop_segment();
-                }
-                TYPE_SOURCEROUTING_SEG:{
+            }
+            else if (hdr.sourcerouting.type == TYPE_SOURCEROUTING_SEG){
                     meta.ipv4_target = hdr.sourcerouting.target;
                     sourcerouting_penultimate_hop.apply();
-                }
             }
         }
         else if (hdr.ipv4.isValid()){

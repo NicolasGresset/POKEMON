@@ -2,8 +2,8 @@ from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 import sys
 import json
-from scapy.all import Packet, BitField, IPField, bind_layers
-from scapy.layers.inet import IP
+from scapy.all import Packet, BitField, IPField, bind_layers, sendp, hexdump
+from scapy.layers.inet import IP, Ether
 
 
 class ProbeHeader(Packet):
@@ -273,8 +273,8 @@ class RoutingController(object):
                 continue
 
             neighbor_ip = f"100.0.0.{neighbor[1:]}/32"
-            neighbor_mac = self.topo.node_to_node_mac(self.switch_name, neighbor)
-            neighbor_port = self.topo.node_to_node_port_num(neighbor, self.switch_name)
+            neighbor_mac = self.topo.node_to_node_mac(neighbor, self.switch_name)
+            neighbor_port = self.topo.node_to_node_port_num(self.switch_name, neighbor)
 
             print("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
@@ -290,6 +290,9 @@ class RoutingController(object):
             )
 
     def probe_setup(self):
+        # Provide his probe_id to DataPlan
+        self.controller.register_write("probe_id", 0, 0x64000000 + int(self.switch_name[1:]))
+
         # Add add an entry for each router in topo in both table
         index = 0
         for sw in self.topo.get_p4switches():
@@ -318,10 +321,31 @@ class RoutingController(object):
             )
 
     def send_probe(self):
-        pass
+        """This function send lossy testing probes and must be called periodically"""
+        if self.switch_name == "s2":
+            return
+
+        neighbors = self.topo.get_switches_connected_to(self.switch_name)
+        my_loopback = "100.0.0." + self.switch_name[1:]
+        ether = Ether(type=0x8849)
+        for neighbor in neighbors:
+            neighbor_loopback = "100.0.0." + neighbor[1:]
+            segment1 = SegmentHeader(target=neighbor_loopback, type=0, bottom=0)
+            segment2 = SegmentHeader(target=my_loopback, type=0, bottom=1)
+            ip = IP(src="0.0.0.0", dst="0.0.0.0", proto=0xFD)
+            probe = ProbeHeader(
+                origin=my_loopback,
+                target=neighbor_loopback,
+                fresh=1,
+                hit=0,
+                recording=0,
+            )
+            packet = ether / segment1 / segment2 / ip / probe
+            print(packet.show())
+            hexdump(packet)
+            sendp(packet, iface=self.controller_cpu_port, verbose=True)
 
     def lossy_rate_callback(self):
-        print(self.switch_name, ": entering callback")
         self.fetch_probe_counters()
         print(self.switch_name, ": Couter succesfully fetched :", self.lossy_probes)
         self.queue_to_meta.put(json.dumps(self.lossy_probes))
@@ -331,6 +355,7 @@ class RoutingController(object):
 
     def main_loop(self):
         print(f"({self.switch_name}) : entering main loop")
+        self.send_probe()
         while True:
             received_order = self.queue_from_meta.get()
             if received_order == "LOSSY_RATE":
