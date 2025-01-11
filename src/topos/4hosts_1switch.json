@@ -1,5 +1,4 @@
 {
-    "p4_src": "p4src_simple_router_loss/simple_router_loss.p4",
     "cli": true,
     "pcap_dump": true,
     "enable_log": true,
@@ -30,7 +29,9 @@
             "h4": {}
         },
         "switches": {
-            "s1": {}
+            "s1": {
+                "p4_src": "p4src/simple_router_stupid.p4"
+            }
         }
     }
 }

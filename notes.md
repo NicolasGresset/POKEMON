@@ -32,3 +32,7 @@ Le simple routeur lossy réutilise le même controlleur que le simple routeur ; 
 le controlleur va renseigner au cp via un registre les ports auxquels sont connectés le switch et celui ci va choisir aléatoirement sur quel port envoyer le paquet
 
 la topologie de test est composée de 5 switchs et deux hôtes, avec deux chemins entre les deux hôtes qui n'ont pas la même longueur
+
+# meta controlleur
+
+je suis parti à 21h32 alors que j'étais en train d'implémenter la commuincation inter threads du meta controlleur

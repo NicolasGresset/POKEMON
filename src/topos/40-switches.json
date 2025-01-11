@@ -270,7 +270,9 @@
       ]
     ],
     "switches": {
-      "s1": {},
+      "s1": {
+        "p4_src": "p4src/simple_router_stupid.p4"
+      },
       "s10": {},
       "s11": {},
       "s12": {},
