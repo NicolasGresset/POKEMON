@@ -285,7 +285,6 @@ class RoutingController(object):
 
     def lossy_rate_callback(self):
         self.fetch_probe_counters()
-        self.lossy_probes["s1"] = (4, 3)
         self.queue_to_meta.put(json.dumps(self.lossy_probes))
 
     def shortest_path_callback(self):
