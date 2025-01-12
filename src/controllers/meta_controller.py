@@ -7,6 +7,7 @@ import queue
 import sys
 import json
 import cmd
+import time
 
 
 class MetaController(cmd.Cmd):
@@ -24,7 +25,13 @@ class MetaController(cmd.Cmd):
         self.ask_lossy_rate_message = "LOSSY_RATE"
         self.ask_shortest_path_stats = "SHORTEST_PATH"
 
+        self.retrieve_stats_thread = threading.Thread(target=self.retrieve_stats_loop)
+        self.retrieve_stats_period = (
+            10  # number of seconds between each value retrieving process
+        )
+
         self.init()
+        self.retrieve_stats_thread.start()
 
     def init(self):
         self.connect_to_switches()
@@ -55,13 +62,13 @@ class MetaController(cmd.Cmd):
 
     def do_ask_lossy_rates(self, args):
         """Ask all controllers to publish their stats about losses"""
-        self.ask_sonde(self.ask_lossy_rate_message)
+        self.display_lossy_rates()
 
     def do_ask_shortest_paths_stats(self, args):
         """Ask all controllers to publish their stats about shortest path stats"""
         self.ask_sonde(self.ask_shortest_path_stats)
 
-    def display_lossy_rates(self, sw_name):
+    def display_lossy_rates(self):
         for sw_name, controller in self.controllers.items():
             dico = json.loads(self.lossy_rates[sw_name])
             print(f"Rates of {sw_name} : ")
@@ -82,14 +89,19 @@ class MetaController(cmd.Cmd):
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
             elif sonde_kind == self.ask_shortest_path_stats:
                 print("Not implemented yet")
-        self.display_lossy_rates(sw_name)
+
+    def retrieve_stats_loop(self):
+        """Ask all conrollers to send sondes each retrieve_stat_period seconds"""
+        while True:
+            self.ask_sonde(self.ask_lossy_rate_message)
+            time.sleep(self.retrieve_stats_period)
 
     def do_exit(self, arg):
         """Exit the shell"""
 
         print("Goodbye!")
         return True
-    
+
     def emptyline(self):
         # Overriding emptyline to do nothing when Enter is pressed
         pass

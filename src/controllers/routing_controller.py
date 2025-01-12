@@ -4,7 +4,14 @@ from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from scapy.all import sendp
 from scapy.layers.inet import IP
 from scapy.layers.l2 import Ether
-from POKEMON_utils.headers import ProbeHeader, SegmentHeader, TYPE_SOURCEROUTING, IP_PROTO_PROBE
+from POKEMON_utils.headers import (
+    ProbeHeader,
+    SegmentHeader,
+    TYPE_SOURCEROUTING,
+    IP_PROTO_PROBE,
+)
+import threading
+import time
 
 class RoutingController(object):
 
@@ -17,6 +24,9 @@ class RoutingController(object):
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
 
+        self.probing_thread = threading.Thread(target=self.probing_loop)
+        self.probing_period = 10  # number of seconds between 2 probes
+        self.probing_thread.start()
 
     def install(self):
         self.controller.reset_state()
@@ -209,7 +219,9 @@ class RoutingController(object):
 
                             # add group
                             for i, (mac, port) in enumerate(dst_macs_ports):
-                                logging.debug("table_add at {}:".format(self.switch_name))
+                                logging.debug(
+                                    "table_add at {}:".format(self.switch_name)
+                                )
                                 self.controller.table_add(
                                     "ecmp_group_to_nhop",
                                     "set_nhop",
@@ -254,10 +266,12 @@ class RoutingController(object):
 
     def probe_setup(self):
         # Associate target id and counter index
-        self.counters_indexes = {} 
-        
+        self.counters_indexes = {}
+
         # Provide his probe_id to DataPlan
-        self.controller.register_write("probe_id", 0, 0x64000000 + int(self.switch_name[1:]))
+        self.controller.register_write(
+            "probe_id", 0, 0x64000000 + int(self.switch_name[1:])
+        )
 
         # Add add an entry for each router in topo in both table
         index = 0
@@ -281,7 +295,7 @@ class RoutingController(object):
 
     def probes_counters(self):
         """return updated probes counters as dictionary (key: target id, value : tuple(outgoing_probes, incoming_probes))"""
-        
+
         probes_counters = {}
         for sw, index in self.counters_indexes.items():
             probes_counters[sw] = (
@@ -289,7 +303,6 @@ class RoutingController(object):
                 self.controller.counter_read("incoming_probes", index)[1],
             )
         return probes_counters
-
 
     def send_probe(self, origin, target, recording=False):
         """Send one probe to cpu port"""
@@ -309,7 +322,7 @@ class RoutingController(object):
         logging.debug(str(packet))
         sendp(packet, iface=self.controller_cpu_port, verbose=True)
 
-    def probing_direct_link(self):
+    def probing_direct_links(self):
         "Send a probe to all neighbor routers"
 
         neighbors = self.topo.get_switches_connected_to(self.switch_name)
@@ -319,15 +332,18 @@ class RoutingController(object):
             self.send_probe(my_loopback, neighbor_loopback, recording=False)
 
     def lossy_rate_callback(self):
-        print(self.switch_name, ": Couter succesfully fetched :", self.probes_counters)
+        print(self.switch_name, ": Counter succesfully fetched :", self.probes_counters)
         self.queue_to_meta.put(json.dumps(self.probes_counters()))
 
     def record_path_callback(self):
         pass
 
+    def probing_loop(self):
+        while True:
+            self.probing_direct_links()
+            time.sleep(self.probing_period)
+
     def main_loop(self):
-        print(f"({self.switch_name}) : entering main loop")
-        self.probing_direct_link()
         while True:
             received_order = self.queue_from_meta.get()
             if received_order == "LOSSY_RATE":
