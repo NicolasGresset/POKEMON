@@ -68,7 +68,7 @@ class MetaController(cmd.Cmd):
         dico = json.loads(self.shortest_paths[src])
         print(f"Paths of {src}")
         print(f"{'dest':<15}{'paths':<65}")
-        paths_string = ",".join(dico[src])
+        paths_string = ",".join(dico[dst])
         print(f"{dst:<15}{paths_string:<65}")
         print("")
 
