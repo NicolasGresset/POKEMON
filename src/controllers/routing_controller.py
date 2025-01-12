@@ -384,10 +384,12 @@ class RoutingController(object):
 
     def main_loop(self):
         while True:
-            received_order = self.queue_from_meta.get()
-            if received_order == "LOSSY_RATE":
+            received_order = self.queue_from_meta.get().split(";")
+            if received_order[0] == "LOSSY_RATE":
                 self.share_lossy_stats()
-            elif received_order == "SHORTEST_PATH":
+            elif received_order[0] == "SHORTEST_PATH":
+                source = received_order[1]
+                dest = received_order[1]
                 self.share_record_paths()
             else:
                 print(

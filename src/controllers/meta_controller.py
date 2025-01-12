@@ -55,20 +55,22 @@ class MetaController(cmd.Cmd):
     def do_ask_shortest_paths_stats(self, args):
         """Ask all controllers to publish their stats about shortest path stats"""
         # display stats about shortest paths
-        self.display_shortest_paths()
+        arg = args.split()
+        if len(arg) != 2:
+            print("Expected ask_shortest_paths src destination")
+            return 1
+        self.queues_from_meta[arg[0]].put(
+            f"{self.ask_shortest_path_stats};{arg[0]};{arg[1]}"
+        )
+        self.display_shortest_paths(arg[0], arg[1])
 
-
-    def display_shortest_paths(self):
-        for sw_name in self.switches:
-            dico = json.loads(self.shortest_paths[sw_name])
-            print(f"Paths of {sw_name}")
-            print(f"{'dest':<15}{'paths':<65}")
-            for sw_dst, paths in dico.items():
-                paths_string = ",".join(paths)
-                print(f"{sw_dst:<15}{paths_string:<65}")
-            print("")
-
-
+    def display_shortest_paths(self, src, dst):
+        dico = json.loads(self.shortest_paths[src])
+        print(f"Paths of {src}")
+        print(f"{'dest':<15}{'paths':<65}")
+        paths_string = ",".join(dico[src])
+        print(f"{dst:<15}{paths_string:<65}")
+        print("")
 
     def display_lossy_rates(self):
         for sw_name in self.switches:
@@ -83,7 +85,7 @@ class MetaController(cmd.Cmd):
     def retrieve_stats(self, sonde_kind):
         for sw_name in self.switches:
             self.queues_from_meta[sw_name].put(sonde_kind)
-        
+
         for sw_name in self.switches:
             if sonde_kind == self.ask_lossy_rate_message:
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
