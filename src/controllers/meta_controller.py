@@ -65,7 +65,8 @@ class MetaController(cmd.Cmd):
         self.display_shortest_paths(arg[0], arg[1])
 
     def display_shortest_paths(self, src, dst):
-        dst_addr = f"100.0.0.{dst}"
+        self.shortest_paths[src] = self.queues_to_meta[src].get()
+        dst_addr = f"100.0.0.{dst[1:]}"
         dico = json.loads(self.shortest_paths[src])
         print(f"Paths of {src}")
         print(f"{'dest':<15}{'paths':<65}")

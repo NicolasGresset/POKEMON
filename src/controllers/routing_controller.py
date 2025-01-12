@@ -1,4 +1,4 @@
-import json, logging, struct, ipaddress
+import sys, io, json, logging, struct, ipaddress
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from scapy.all import sendp
@@ -385,7 +385,7 @@ class RoutingController(object):
             origin = str(ipaddress.IPv4Address(digest_payload[16]))
             target = str(ipaddress.IPv4Address(digest_payload[17]))
             record = [str(ipaddress.IPv4Address(r)) for r in digest_payload[:16][::-1] if r != 0];
-            print(origin, target, record)
+            
             with records_lock:
                 self.records[target] = record
 
@@ -400,7 +400,12 @@ class RoutingController(object):
             elif received_order[0] == "SHORTEST_PATH":
                 source = received_order[1]
                 dest = received_order[2]
-                self.share_record_paths()
+                if(self.switch_name == source):
+                    self.send_probe(f"100.0.0.{source[1:]}", f"100.0.0.{dest[1:]}", type=TYPE_SOURCEROUTING_SEG, recording=True)
+                    time.sleep(3)
+                    with records_lock:
+                        self.queue_to_meta.put(json.dumps(self.records))
+                #self.share_record_paths()
             else:
                 print(
                     "Error: received unexpected order from meta-controller : ",
