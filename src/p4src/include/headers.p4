@@ -14,8 +14,7 @@ typedef bit<32> ip4Addr_t;
 const bit<1> TYPE_SOURCEROUTING_LINK = 0;
 const bit<1> TYPE_SOURCEROUTING_SEG = 1;
 
-#define MAX_HOP 8
-#define _32MAX_HOP 256
+#define MAX_HOP 16
 
 /**
 * @brief encapsulation headers to impose intermediate nodes of passage for 
@@ -93,7 +92,8 @@ header tcp_t{
 }
 
 struct digest_message_t {
-    bit<_32MAX_HOP> records;
+    bit<256> records_top;
+    bit<256> records_bot;
     ip4Addr_t origin;
     ip4Addr_t target;
 }
