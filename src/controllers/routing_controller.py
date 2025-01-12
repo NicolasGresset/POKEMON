@@ -12,6 +12,8 @@ from POKEMON_utils.headers import (
 )
 import threading
 import time
+import nnpy
+import binascii
 
 class RoutingController(object):
 
@@ -24,9 +26,15 @@ class RoutingController(object):
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
 
+        # This thread periodically send probes to the dataplane
         self.probing_thread = threading.Thread(target=self.probing_loop)
         self.probing_period = 10  # number of seconds between 2 probes
         self.probing_thread.start()
+
+        self.sniffing_digest_thread = threading.Thread(target=self.sniffing_digest_loop)
+        self.sniffing_digest_thread.start()
+        self.thrift_port = self.topo.get_thrift_port(self.switch_name)
+        self.controller = SimpleSwitchThriftAPI(self.thrift_port)
 
     def install(self):
         self.controller.reset_state()
@@ -320,7 +328,7 @@ class RoutingController(object):
         )
         packet = ether / segment1 / segment2 / ip / probe
         logging.debug(str(packet))
-        sendp(packet, iface=self.controller_cpu_port, verbose=True)
+        sendp(packet, iface=self.controller_cpu_port)
 
     def probing_direct_links(self):
         "Send a probe to all neighbor routers"
@@ -331,11 +339,10 @@ class RoutingController(object):
             neighbor_loopback = "100.0.0." + neighbor[1:]
             self.send_probe(my_loopback, neighbor_loopback, recording=False)
 
-    def lossy_rate_callback(self):
-        print(self.switch_name, ": Counter succesfully fetched :", self.probes_counters)
+    def share_lossy_stats(self):
         self.queue_to_meta.put(json.dumps(self.probes_counters()))
 
-    def record_path_callback(self):
+    def share_record_paths(self):
         pass
 
     def probing_loop(self):
@@ -343,13 +350,32 @@ class RoutingController(object):
             self.probing_direct_links()
             time.sleep(self.probing_period)
 
+    def sniffing_digest_loop(self):
+        sub = nnpy.Socket(nnpy.AF_SP, nnpy.SUB)
+        notifications_socket = (
+            self.controller.client.bm_mgmt_get_info().notifications_socket
+        )
+
+        sub.connect(notifications_socket)
+        sub.setsockopt(nnpy.SUB, nnpy.SUB_SUBSCRIBE, "")
+
+        while True:
+            print("ENtering probing_loop ---------------------------------------------------")
+            # self.send_probe("100.0.0.1", "100.0.0.2", True)
+            # self.send_probe("100.0.0.2", "100.0.0.1", True)
+
+            msg = sub.recv()
+            # implement logic when receiving packets
+            hexdump = binascii.hexlify(msg).decode('utf-8')  # Convert to hexadecimal string
+            print(f"Received packet (hexdump): {hexdump}")
+
     def main_loop(self):
         while True:
             received_order = self.queue_from_meta.get()
             if received_order == "LOSSY_RATE":
-                self.lossy_rate_callback()
+                self.share_lossy_stats()
             elif received_order == "SHORTEST_PATH":
-                self.record_path_callback()
+                self.share_record_paths()
             else:
                 print(
                     "Error: received unexpected order from meta-controller : ",

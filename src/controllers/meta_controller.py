@@ -62,11 +62,13 @@ class MetaController(cmd.Cmd):
 
     def do_ask_lossy_rates(self, args):
         """Ask all controllers to publish their stats about losses"""
+        self.retrieve_stats(self.ask_lossy_rate_message)
         self.display_lossy_rates()
 
     def do_ask_shortest_paths_stats(self, args):
         """Ask all controllers to publish their stats about shortest path stats"""
-        self.ask_sonde(self.ask_shortest_path_stats)
+        # display stats about shortest paths
+        pass
 
     def display_lossy_rates(self):
         for sw_name, controller in self.controllers.items():
@@ -78,22 +80,23 @@ class MetaController(cmd.Cmd):
                 print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
             print("")
 
-    def ask_sonde(self, sonde_kind):
+    def retrieve_stats(self, sonde_kind):
         for sw_name, controller in self.controllers.items():
             print("Sending a request to", sw_name)
             self.queues_from_meta[sw_name].put(sonde_kind)
-
+        
         for sw_name, controller in self.controllers.items():
             if sonde_kind == self.ask_lossy_rate_message:
                 print("Trying to receive the response from", sw_name)
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
             elif sonde_kind == self.ask_shortest_path_stats:
-                print("Not implemented yet")
+                print("Received shortest paths stats : Not implemented yet")
 
     def retrieve_stats_loop(self):
-        """Ask all conrollers to send sondes each retrieve_stat_period seconds"""
+        """Ask all controllers to share stats each retrieve_stat_period seconds"""
         while True:
-            self.ask_sonde(self.ask_lossy_rate_message)
+            self.retrieve_stats(self.ask_lossy_rate_message)
+            self.retrieve_stats(self.ask_shortest_path_stats)
             time.sleep(self.retrieve_stats_period)
 
     def do_exit(self, arg):
