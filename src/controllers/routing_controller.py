@@ -1,4 +1,4 @@
-import json, logging
+import json, logging, struct
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from scapy.all import sendp
@@ -13,13 +13,12 @@ from POKEMON_utils.headers import (
 import threading
 import time
 import nnpy
-import binascii
 
 
 class RoutingController(object):
 
     def __init__(self, switch_name: str, queue_from_meta, queue_to_meta):
-
+        logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
         self.connect_to_switch()
@@ -62,12 +61,13 @@ class RoutingController(object):
         self.controller.table_set_default("count_incoming_probes", "NoAction", [])
 
     def route(self):
-
+        logging.basicConfig(level=logging.DEBUG)
         switch_ecmp_groups = {self.switch_name: {}}
 
         # sw_name = nom du switch d'intérêt
         # controller = nom du controlleur associé à ce switch
         for sw_dst in self.topo.get_p4switches():
+            print("NAME:",sw_dst)
 
             # if its ourselves we create direct connections
             if self.switch_name == sw_dst:
@@ -313,13 +313,13 @@ class RoutingController(object):
             )
         return probes_counters
 
-    def send_probe(self, origin, target, recording=False):
+    def send_probe(self, origin, target, type=1, recording=False):
         """Send one probe to cpu port"""
 
         ether = Ether(type=TYPE_SOURCEROUTING)
-        segment1 = SegmentHeader(target=target, type=0, bottom=0)
-        segment2 = SegmentHeader(target=origin, type=0, bottom=1)
-        ip = IP(src="0.0.0.0", dst="0.0.0.0", proto=IP_PROTO_PROBE)
+        segment1 = SegmentHeader(target=target, type=type, bottom=0)
+        segment2 = SegmentHeader(target=origin, type=type, bottom=1)
+        ip = IP(src=origin, dst=origin, proto=IP_PROTO_PROBE)
         probe = ProbeHeader(
             origin=origin,
             target=target,
@@ -347,6 +347,15 @@ class RoutingController(object):
             switch_loopback = "100.0.0." + switch[1:]
             self.send_probe(my_loopback, switch_loopback, recording=True)
 
+    def parse_records(self, msg):
+        print(msg)
+        records= struct.unpack(">8iii", msg[32:72])
+        print(records)
+        records_list = list(records)
+        print("origin: ", records[8])
+        print("target: ", records[9])
+        print("records: ", records[:7])
+    
     def share_lossy_stats(self):
         self.queue_to_meta.put(json.dumps(self.probes_counters()))
 
@@ -355,8 +364,9 @@ class RoutingController(object):
 
     def probing_loop(self):
         while True:
-            self.probing_topology(only_direct_link=False)
-            self.probing_topology(only_direct_link=True)
+            #self.probing_topology(only_direct_link=False)
+            #self.probing_topology(only_direct_link=True)
+            self.send_probe("100.0.0.1", "100.0.0.2", type=1, recording=True)
             time.sleep(self.probing_period)
 
     def sniffing_digest_loop(self):
@@ -370,11 +380,7 @@ class RoutingController(object):
 
         while True:
             msg = sub.recv()
-            # implement logic when receiving packets
-            hexdump = binascii.hexlify(msg).decode(
-                "utf-8"
-            )  # Convert to hexadecimal string
-            print(f"Received packet (hexdump): {hexdump}")
+            self.parse_records(msg)
 
     def main_loop(self):
         while True:

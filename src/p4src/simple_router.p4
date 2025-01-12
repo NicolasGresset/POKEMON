@@ -81,14 +81,18 @@ control MyIngress(inout headers hdr,
     }
 
     action copy_to_digest() {
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[0].id) << 32 * 0; 
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[1].id) << 32 * 1;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[2].id) << 32 * 2;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[3].id) << 32 * 3;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[4].id) << 32 * 4;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[5].id) << 32 * 5;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[6].id) << 32 * 6;
-        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[7].id) << 32 * 7;
+        meta.digest_records.origin = hdr.probe.origin;
+        meta.digest_records.target = hdr.probe.target;
+
+        meta.digest_records.records = 0;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[0].id) << 32 * 7 )    ;    
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[1].id) << 32 * 6 )    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[2].id) << 32 * 5)    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[3].id) << 32 * 4)    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[4].id) << 32 * 3)    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[5].id) << 32 * 2)    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[6].id) << 32 * 1)    ;
+        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[7].id) << 32 * 0)    ;
     }
 
 

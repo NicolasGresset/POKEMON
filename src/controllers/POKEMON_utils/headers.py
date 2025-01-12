@@ -11,7 +11,7 @@ class ProbeHeader(Packet):
         BitField("fresh", 0, 1),  # fresh as a 1-bit field
         BitField("hit", 0, 1),  # hit as a 1-bit field
         BitField("recording", 0, 1),  # recording as a 1-bit field
-        BitField("empty_record", 0, 1),  # empty_record as a 1-bit field
+        BitField("empty_record", 1, 1),  # empty_record as a 1-bit field
         BitField("exp", 0, 4),  # experimental as a 4-bit field
     ]
 
