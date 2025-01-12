@@ -82,12 +82,10 @@ class MetaController(cmd.Cmd):
 
     def retrieve_stats(self, sonde_kind):
         for sw_name, controller in self.controllers.items():
-            print("Sending a request to", sw_name)
             self.queues_from_meta[sw_name].put(sonde_kind)
         
         for sw_name, controller in self.controllers.items():
             if sonde_kind == self.ask_lossy_rate_message:
-                print("Trying to receive the response from", sw_name)
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
             elif sonde_kind == self.ask_shortest_path_stats:
                 print("Received shortest paths stats : Not implemented yet")

@@ -15,6 +15,7 @@ import time
 import nnpy
 import binascii
 
+
 class RoutingController(object):
 
     def __init__(self, switch_name: str, queue_from_meta, queue_to_meta):
@@ -330,14 +331,19 @@ class RoutingController(object):
         logging.debug(str(packet))
         sendp(packet, iface=self.controller_cpu_port)
 
-    def probing_direct_links(self):
-        "Send a probe to all neighbor routers"
+    def probing_topology(self, only_direct_link: bool):
+        """Send a recording probe to routers in the topology except itself
+        If only_direct_link is sent, probes are only sent to nodes directly connected"""
 
-        neighbors = self.topo.get_switches_connected_to(self.switch_name)
+        if only_direct_link:
+            switches = self.topo.get_switches_connected_to(self.switch_name)
+        else:
+            switches = self.topo.get_p4switches()
+
         my_loopback = "100.0.0." + self.switch_name[1:]
-        for neighbor in neighbors:
-            neighbor_loopback = "100.0.0." + neighbor[1:]
-            self.send_probe(my_loopback, neighbor_loopback, recording=False)
+        for switch in switches:
+            switch_loopback = "100.0.0." + switch[1:]
+            self.send_probe(my_loopback, switch_loopback, recording=True)
 
     def share_lossy_stats(self):
         self.queue_to_meta.put(json.dumps(self.probes_counters()))
@@ -347,7 +353,8 @@ class RoutingController(object):
 
     def probing_loop(self):
         while True:
-            self.probing_direct_links()
+            self.probing_topology(only_direct_link=False)
+            self.probing_topology(only_direct_link=True)
             time.sleep(self.probing_period)
 
     def sniffing_digest_loop(self):
@@ -360,13 +367,17 @@ class RoutingController(object):
         sub.setsockopt(nnpy.SUB, nnpy.SUB_SUBSCRIBE, "")
 
         while True:
-            print("ENtering probing_loop ---------------------------------------------------")
+            print(
+                "ENtering probing_loop ---------------------------------------------------"
+            )
             # self.send_probe("100.0.0.1", "100.0.0.2", True)
             # self.send_probe("100.0.0.2", "100.0.0.1", True)
 
             msg = sub.recv()
             # implement logic when receiving packets
-            hexdump = binascii.hexlify(msg).decode('utf-8')  # Convert to hexadecimal string
+            hexdump = binascii.hexlify(msg).decode(
+                "utf-8"
+            )  # Convert to hexadecimal string
             print(f"Received packet (hexdump): {hexdump}")
 
     def main_loop(self):
