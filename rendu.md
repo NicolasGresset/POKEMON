@@ -1,6 +1,6 @@
 # Compte-rendu
 
-Ce document est le compte-rendu du projet POKEMON de Nicolas Gresset-Bourgeois et Matthieu Ferreira--Rivier.
+Ce document est le compte-rendu du projet POKEMON de Nicolas Gresset-Bourgeois et Matthieu Ferreira--Rivier. Le code pour ce rapport est disponible dans ce[repository](https://github.com/NicolasGresset/POKEMON).
 
 ## Terminologie
 
@@ -121,7 +121,7 @@ La topologie utilisée pour ce test est `topos/lossy_router_test.json` : deux h�
 ### Simple router stupid
 
 Le routeur stupide est un équipement qui transmet les paquets entrants sur un port aléatoire. Cette logique n'est pas appliqué si le paquet est de type source routing et que le segment est spécifié par lien.
-Pour transmettre sur un port aléatoire, le switch doit être conscient du nombre de ports auxquels il est connecté, information non nativement accessible depuis le plan de données. Cette information est donc apportée par le controlleur à l'initialisation via un registre dédié :
+Pour transmettre sur un port aléatoire, le switch doit être conscient du nombre de ports auxquels il est connecté, information non nativement accessible depuis le plan de données. Cette information est donc apportée par le contrôleur à l'initialisation via un registre dédié :
 
 ```python
 self.controller.register_write("number_of_ports", 0, number_of_ports)
@@ -304,10 +304,44 @@ def share_lossy_stats(self):
 
 Le méta-contrôleur demande régulièrement (toutes les 10 secondes) aux contrôleurs de remonter leurs statistiques. Elles peuvent être affichées par l'utilisateur à la demande via la commande `ask_lossy_rates`.
 
+On essaie avec la topologie suivante : 
+
+![display](./img/display_lossy.png)
+
 Un affichage typique est le suivant :
 
 ```
-#TODO print example display
+Rates of s1 :
+dest           outgoing       incoming       ratio
+100.0.0.2      2              1              0.5
+dest           outgoing       incoming       ratio
+100.0.0.3      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.4      0              0              0
+
+Rates of s2 :
+dest           outgoing       incoming       ratio
+100.0.0.1      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.3      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.4      0              0              0
+
+Rates of s3 :
+dest           outgoing       incoming       ratio
+100.0.0.1      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.2      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.4      0              0              0
+
+Rates of s4 :
+dest           outgoing       incoming       ratio
+100.0.0.1      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.2      0              0              0
+dest           outgoing       incoming       ratio
+100.0.0.3      0              0              0
 ```
 
 ## Analyse des plus courts chemins
