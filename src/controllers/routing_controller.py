@@ -1,40 +1,10 @@
+import json, logging
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
-import sys
-import json
-from scapy.all import Packet, BitField, IPField, bind_layers, sendp, hexdump
-from scapy.layers.inet import IP, Ether
-
-
-class ProbeHeader(Packet):
-    name = "ProbeHeader"
-    fields_desc = [
-        IPField("origin", "0.0.0.0"),  # origin as IPv4
-        IPField("target", "0.0.0.0"),  # target as IPv4
-        BitField("fresh", 0, 1),  # fresh as a 1-bit field
-        BitField("hit", 0, 1),  # hit as a 1-bit field
-        BitField("recording", 0, 1),  # recording as a 1-bit field
-        BitField("empty_record", 0, 1),  # empty_record as a 1-bit field
-        BitField("exp", 0, 4),  # experimental as a 4-bit field
-    ]
-
-
-class SegmentHeader(Packet):
-    name = "SegmentHeader"
-    fields_desc = [
-        IPField("target", "0.0.0.0"),  # IPv4 address field
-        BitField("type", 0, 1),  # 1-bit field for 'type'
-        BitField("bottom", 0, 1),  # 1-bit field for 'bottom'
-        BitField("exp", 0, 6),  # 6-bit field for 'exp'
-    ]
-
-    # Define the behavior to guess the next layer
-    def guess_payload_class(self, payload):
-        # If 'bottom' bit is set, there is no more header to parse
-        if self.bottom == 1:
-            return Raw  # No more headers, treat remaining as Raw data
-        return SegmentHeader  # Otherwise, parse the next header as SegmentHeader
-
+from scapy.all import sendp
+from scapy.layers.inet import IP
+from scapy.layers.l2 import Ether
+from POKEMON_utils.headers import ProbeHeader, SegmentHeader, TYPE_SOURCEROUTING, IP_PROTO_PROBE
 
 class RoutingController(object):
 
@@ -42,32 +12,25 @@ class RoutingController(object):
 
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
-        self.counters_indexes = {}
-        self.lossy_probes = (
-            {}
-        )  # key: switch connected to the dp, value : tuple(outgoing_probes, incoming_probes)
-        self.init()
+        self.connect_to_switch()
+        self.install()
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
 
-        self.controller_cpu_port = self.topo.get_ctl_cpu_intf(
-            self.switch_name
-        )  # port to send packets to the dataplane
 
-    def init(self):
-        self.connect_to_switch()
-        self.reset_state()
+    def install(self):
+        self.controller.reset_state()
         self.set_table_defaults()
         self.route()
         self.sourcerouting()
         self.probe_setup()
 
-    def reset_state(self):
-        self.controller.reset_state()
-
     def connect_to_switch(self):
         thrift_port = self.topo.get_thrift_port(self.switch_name)
         self.controller = SimpleSwitchThriftAPI(thrift_port)
+        self.controller_cpu_port = self.topo.get_ctl_cpu_intf(
+            self.switch_name
+        )  # port to send packets to the dataplane
 
     def set_table_defaults(self):
         self.controller.table_set_default("ipv4_lpm", "drop", [])
@@ -95,7 +58,7 @@ class RoutingController(object):
                     host_mac = self.topo.get_host_mac(host)
 
                     # add rule
-                    print("table_add at {}:".format(self.switch_name))
+                    logging.debug("table_add at {}:".format(self.switch_name))
                     self.controller.table_add(
                         "ipv4_lpm",
                         "set_nhop",
@@ -119,7 +82,7 @@ class RoutingController(object):
                     dst_sw_mac = self.topo.node_to_node_mac(next_hop, self.switch_name)
 
                     # add rule
-                    print("table_add at {}:".format(self.switch_name))
+                    logging.debug("table_add at {}:".format(self.switch_name))
                     self.controller.table_add(
                         "ipv4_lpm",
                         "set_nhop",
@@ -145,7 +108,7 @@ class RoutingController(object):
                         ecmp_group_id = switch_ecmp_groups[self.switch_name].get(
                             tuple(dst_macs_ports), None
                         )
-                        print("table_add at {}:".format(self.switch_name))
+                        logging.debug("table_add at {}:".format(self.switch_name))
                         self.controller.table_add(
                             "ipv4_lpm",
                             "ecmp_group",
@@ -164,7 +127,7 @@ class RoutingController(object):
 
                         # add group
                         for i, (mac, port) in enumerate(dst_macs_ports):
-                            print("table_add at {}:".format(self.switch_name))
+                            logging.debug("table_add at {}:".format(self.switch_name))
                             self.controller.table_add(
                                 "ecmp_group_to_nhop",
                                 "set_nhop",
@@ -173,7 +136,7 @@ class RoutingController(object):
                             )
 
                         # add forwarding rule
-                        print("table_add at {}:".format(self.switch_name))
+                        logging.debug("table_add at {}:".format(self.switch_name))
                         self.controller.table_add(
                             "ipv4_lpm",
                             "ecmp_group",
@@ -191,14 +154,14 @@ class RoutingController(object):
 
                         host_ip = self.topo.get_host_ip(host) + "/24"
                         sw_port = self.topo.node_to_node_port_num(
-                            self.switch_name, next_hop
+                       this is the direct counter for table     self.switch_name, next_hop
                         )
                         dst_sw_mac = self.topo.node_to_node_mac(
                             next_hop, self.switch_name
                         )
 
                         # add rule
-                        print("table_add at {}:".format(self.switch_name))
+                        logging.debug("table_add at {}:".format(self.switch_name))
                         self.controller.table_add(
                             "ipv4_lpm",
                             "set_nhop",
@@ -227,7 +190,7 @@ class RoutingController(object):
                             ecmp_group_id = switch_ecmp_groups[self.switch_name].get(
                                 tuple(dst_macs_ports), None
                             )
-                            print("table_add at {}:".format(self.switch_name))
+                            logging.debug("table_add at {}:".format(self.switch_name))
                             self.controller.table_add(
                                 "ipv4_lpm",
                                 "ecmp_group",
@@ -246,7 +209,7 @@ class RoutingController(object):
 
                             # add group
                             for i, (mac, port) in enumerate(dst_macs_ports):
-                                print("table_add at {}:".format(self.switch_name))
+                                logging.debug("table_add at {}:".format(self.switch_name))
                                 self.controller.table_add(
                                     "ecmp_group_to_nhop",
                                     "set_nhop",
@@ -255,7 +218,7 @@ class RoutingController(object):
                                 )
 
                             # add forwarding rule
-                            print("table_add at {}:".format(self.switch_name))
+                            logging.debug("table_add at {}:".format(self.switch_name))
                             self.controller.table_add(
                                 "ipv4_lpm",
                                 "ecmp_group",
@@ -276,7 +239,7 @@ class RoutingController(object):
             neighbor_mac = self.topo.node_to_node_mac(neighbor, self.switch_name)
             neighbor_port = self.topo.node_to_node_port_num(self.switch_name, neighbor)
 
-            print("table_add at {}:".format(self.switch_name))
+            logging.debug("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
                 "sourcerouting_link",
                 "set_nhop",
@@ -284,12 +247,15 @@ class RoutingController(object):
                 [str(neighbor_mac), str(neighbor_port)],
             )
 
-            print("table_add at {}:".format(self.switch_name))
+            logging.debug("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
                 "sourcerouting_penultimate_hop", "pop_segment", [str(neighbor_ip)], []
             )
 
     def probe_setup(self):
+        # Associate target id and counter index
+        self.counters_indexes = {} 
+        
         # Provide his probe_id to DataPlan
         self.controller.register_write("probe_id", 0, 0x64000000 + int(self.switch_name[1:]))
 
@@ -303,70 +269,73 @@ class RoutingController(object):
             self.counters_indexes[sw_id] = index
             index += 1
 
-            print("table_add at {}:".format(self.switch_name))
+            logging.debug("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
                 "count_outgoing_probes", "NoAction", [str(sw_id)], []
             )
 
-            print("table_add at {}:".format(self.switch_name))
+            logging.debug("table_add at {}:".format(self.switch_name))
             self.controller.table_add(
                 "count_incoming_probes", "NoAction", [str(sw_id)], []
             )
 
-    def fetch_probe_counters(self):
+    def probes_counters(self):
+        """return updated probes counters as dictionary (key: target id, value : tuple(outgoing_probes, incoming_probes))"""
+        
+        probes_counters = {}
         for sw, index in self.counters_indexes.items():
-            self.lossy_probes[sw] = (
+            probes_counters[sw] = (
                 self.controller.counter_read("outgoing_probes", index)[1],
                 self.controller.counter_read("incoming_probes", index)[1],
             )
+        return probes_counters
 
-    def send_probe(self):
-        """This function send lossy testing probes and must be called periodically"""
+
+    def send_probe(self, origin, target, recording=False):
+        """Send one probe to cpu port"""
+
+        ether = Ether(type=TYPE_SOURCEROUTING)
+        segment1 = SegmentHeader(target=target, type=0, bottom=0)
+        segment2 = SegmentHeader(target=origin, type=0, bottom=1)
+        ip = IP(src="0.0.0.0", dst="0.0.0.0", proto=IP_PROTO_PROBE)
+        probe = ProbeHeader(
+            origin=origin,
+            target=target,
+            fresh=1,
+            hit=0,
+            recording=int(recording),
+        )
+        packet = ether / segment1 / segment2 / ip / probe
+        logging.debug(str(packet))
+        sendp(packet, iface=self.controller_cpu_port, verbose=True)
+
+    def probing_direct_link(self):
+        "Send a probe to all neighbor routers"
 
         neighbors = self.topo.get_switches_connected_to(self.switch_name)
         my_loopback = "100.0.0." + self.switch_name[1:]
-        ether = Ether(type=0x8849)
         for neighbor in neighbors:
             neighbor_loopback = "100.0.0." + neighbor[1:]
-            segment1 = SegmentHeader(target=neighbor_loopback, type=0, bottom=0)
-            segment2 = SegmentHeader(target=my_loopback, type=0, bottom=1)
-            ip = IP(src="0.0.0.0", dst="0.0.0.0", proto=0xFD)
-            probe = ProbeHeader(
-                origin=my_loopback,
-                target=neighbor_loopback,
-                fresh=1,
-                hit=0,
-                recording=0,
-            )
-            packet = ether / segment1 / segment2 / ip / probe
-            print(packet.show())
-            hexdump(packet)
-            sendp(packet, iface=self.controller_cpu_port, verbose=True)
+            self.send_probe(my_loopback, neighbor_loopback, recording=False)
 
     def lossy_rate_callback(self):
-        self.fetch_probe_counters()
-        print(self.switch_name, ": Couter succesfully fetched :", self.lossy_probes)
-        self.queue_to_meta.put(json.dumps(self.lossy_probes))
+        print(self.switch_name, ": Couter succesfully fetched :", self.probes_counters)
+        self.queue_to_meta.put(json.dumps(self.probes_counters()))
 
-    def shortest_path_callback(self):
+    def record_path_callback(self):
         pass
 
     def main_loop(self):
         print(f"({self.switch_name}) : entering main loop")
-        self.send_probe()
+        self.probing_direct_link()
         while True:
             received_order = self.queue_from_meta.get()
             if received_order == "LOSSY_RATE":
                 self.lossy_rate_callback()
             elif received_order == "SHORTEST_PATH":
-                self.shortest_path_callback()
+                self.record_path_callback()
             else:
                 print(
                     "Error: received unexpected order from meta-controller : ",
                     received_order,
                 )
-
-
-if __name__ == "__main__":
-    switch = sys.argv[1]
-    controller = RoutingController(switch).main_loop()
