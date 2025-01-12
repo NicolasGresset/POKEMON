@@ -389,7 +389,7 @@ class RoutingController(object):
                 self.share_lossy_stats()
             elif received_order[0] == "SHORTEST_PATH":
                 source = received_order[1]
-                dest = received_order[1]
+                dest = received_order[2]
                 self.share_record_paths()
             else:
                 print(

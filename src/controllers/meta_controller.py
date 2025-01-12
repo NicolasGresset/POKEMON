@@ -65,10 +65,11 @@ class MetaController(cmd.Cmd):
         self.display_shortest_paths(arg[0], arg[1])
 
     def display_shortest_paths(self, src, dst):
+        dst_addr = f"100.0.0.{dst}"
         dico = json.loads(self.shortest_paths[src])
         print(f"Paths of {src}")
         print(f"{'dest':<15}{'paths':<65}")
-        paths_string = ",".join(dico[dst])
+        paths_string = ",".join(dico[dst_addr])
         print(f"{dst:<15}{paths_string:<65}")
         print("")
 
@@ -96,7 +97,7 @@ class MetaController(cmd.Cmd):
         """Ask all controllers to share stats each retrieve_stat_period seconds"""
         while True:
             self.retrieve_stats(self.ask_lossy_rate_message)
-            self.retrieve_stats(self.ask_shortest_path_stats)
+            # self.retrieve_stats(self.ask_shortest_path_stats)
             time.sleep(self.retrieve_stats_period)
 
     def do_exit(self, arg):
