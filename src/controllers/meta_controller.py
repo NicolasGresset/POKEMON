@@ -62,7 +62,6 @@ class MetaController(cmd.Cmd):
 
     def do_ask_lossy_rates(self, args):
         """Ask all controllers to publish their stats about losses"""
-        self.retrieve_stats(self.ask_lossy_rate_message)
         self.display_lossy_rates()
 
     def do_ask_shortest_paths_stats(self, args):
