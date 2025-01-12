@@ -3,6 +3,9 @@ from scapy.all import Packet, BitField, IPField
 TYPE_SOURCEROUTING = 0x8849;
 IP_PROTO_PROBE = 0xfd;
 
+TYPE_SOURCEROUTING_LINK = 0;
+TYPE_SOURCEROUTING_SEG = 1;
+
 class ProbeHeader(Packet):
     name = "ProbeHeader"
     fields_desc = [
@@ -20,7 +23,7 @@ class SegmentHeader(Packet):
     name = "SegmentHeader"
     fields_desc = [
         IPField("target", "0.0.0.0"),  # IPv4 address field
-        BitField("type", 0, 1),  # 1-bit field for 'type'
+        BitField("type", TYPE_SOURCEROUTING_SEG, 1),  # 1-bit field for 'type'
         BitField("bottom", 0, 1),  # 1-bit field for 'bottom'
         BitField("exp", 0, 6),  # 6-bit field for 'exp'
     ]

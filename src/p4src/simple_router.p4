@@ -84,15 +84,41 @@ control MyIngress(inout headers hdr,
         meta.digest_records.origin = hdr.probe.origin;
         meta.digest_records.target = hdr.probe.target;
 
-        meta.digest_records.records = 0;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[0].id) << 32 * 7 )    ;    
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[1].id) << 32 * 6 )    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[2].id) << 32 * 5)    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[3].id) << 32 * 4)    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[4].id) << 32 * 3)    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[5].id) << 32 * 2)    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[6].id) << 32 * 1)    ;
-        meta.digest_records.records = meta.digest_records.records     + (    ((bit<_32MAX_HOP>)hdr.records[7].id) << 32 * 0)    ;
+        meta.digest_records.records_top = 0;
+        if (hdr.records[0].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[0].id) << 32 * 7)    ;    
+        if (hdr.records[1].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[1].id) << 32 * 6)    ;
+        if (hdr.records[2].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[2].id) << 32 * 5)    ;
+        if (hdr.records[3].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[3].id) << 32 * 4)    ;
+        if (hdr.records[4].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[4].id) << 32 * 3)    ;
+        if (hdr.records[5].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[5].id) << 32 * 2)    ;
+        if (hdr.records[6].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[6].id) << 32 * 1)    ;
+        if (hdr.records[7].isValid())
+            meta.digest_records.records_top = meta.digest_records.records_top     + (    ((bit<256>)hdr.records[7].id) << 32 * 0)    ;
+
+        meta.digest_records.records_bot = 0;
+        if (hdr.records[8].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[8].id) << 32 * 7 )    ;    
+        if (hdr.records[9].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[9].id) << 32 * 6 )    ;
+        if (hdr.records[10].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[10].id) << 32 * 5)    ;
+        if (hdr.records[11].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[11].id) << 32 * 4)    ;
+        if (hdr.records[12].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[12].id) << 32 * 3)    ;
+        if (hdr.records[13].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[13].id) << 32 * 2)    ;
+        if (hdr.records[14].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[14].id) << 32 * 1)    ;
+        if (hdr.records[15].isValid())
+            meta.digest_records.records_bot = meta.digest_records.records_bot     + (    ((bit<256>)hdr.records[15].id) << 32 * 0)    ;
     }
 
 
@@ -235,9 +261,10 @@ control MyIngress(inout headers hdr,
                 }
                 else {
                     count_incoming_probes.apply();
-                    if(hdr.probe.recording == 1)
+                    if(hdr.probe.recording == 1){
                         copy_to_digest();
                         digest(1, meta.digest_records);
+                    }
                 }
             }
             if(meta.probe_id == hdr.probe.target)

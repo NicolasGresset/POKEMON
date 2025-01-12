@@ -1,4 +1,4 @@
-import json, logging, struct
+import json, logging, struct, ipaddress
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from scapy.all import sendp
@@ -9,11 +9,14 @@ from POKEMON_utils.headers import (
     SegmentHeader,
     TYPE_SOURCEROUTING,
     IP_PROTO_PROBE,
+    TYPE_SOURCEROUTING_LINK,
+    TYPE_SOURCEROUTING_SEG,
 )
 import threading
 import time
 import nnpy
 
+records_lock = threading.Lock()
 
 class RoutingController(object):
 
@@ -25,6 +28,7 @@ class RoutingController(object):
         self.install()
         self.queue_from_meta = queue_from_meta
         self.queue_to_meta = queue_to_meta
+        self.records = {}
 
         # This thread periodically send probes to the dataplane
         self.probing_thread = threading.Thread(target=self.probing_loop)
@@ -61,7 +65,6 @@ class RoutingController(object):
         self.controller.table_set_default("count_incoming_probes", "NoAction", [])
 
     def route(self):
-        logging.basicConfig(level=logging.DEBUG)
         switch_ecmp_groups = {self.switch_name: {}}
 
         # sw_name = nom du switch d'intérêt
@@ -313,7 +316,7 @@ class RoutingController(object):
             )
         return probes_counters
 
-    def send_probe(self, origin, target, type=1, recording=False):
+    def send_probe(self, origin, target, type=TYPE_SOURCEROUTING_SEG, recording=False):
         """Send one probe to cpu port"""
 
         ether = Ether(type=TYPE_SOURCEROUTING)
@@ -331,42 +334,36 @@ class RoutingController(object):
         logging.debug(str(packet))
         sendp(packet, iface=self.controller_cpu_port)
 
-    def probing_topology(self, only_direct_link: bool):
-        """Send a recording probe to routers in the topology except itself
-        If only_direct_link is sent, probes are only sent to nodes directly connected"""
-
-        if only_direct_link:
-            switches = self.topo.get_switches_connected_to(self.switch_name)
-        else:
-            switches = self.topo.get_p4switches()
+    def probing_direct_link(self):
+        "Send a probe to all neighbor routers"
 
         my_loopback = "100.0.0." + self.switch_name[1:]
-        for switch in switches:
-            if (switch == self.switch_name):
-                continue
-            switch_loopback = "100.0.0." + switch[1:]
-            self.send_probe(my_loopback, switch_loopback, recording=True)
+        for neighbor in self.topo.get_switches_connected_to(self.switch_name):
+            neighbor_loopback = "100.0.0." + neighbor[1:]
+            self.send_probe(my_loopback, neighbor_loopback, type=TYPE_SOURCEROUTING_LINK, recording=False)
+    
+    def probing_paths(self):
+        "Send a hops recording probe to all routers"
 
-    def parse_records(self, msg):
-        print(msg)
-        records= struct.unpack(">8iii", msg[32:72])
-        print(records)
-        records_list = list(records)
-        print("origin: ", records[8])
-        print("target: ", records[9])
-        print("records: ", records[:7])
+        my_loopback = "100.0.0." + self.switch_name[1:]
+        for target in self.topo.get_p4switches():
+            if(target == self.switch_name):
+                continue
+            print(self.switch_name, target)
+            target_loopback = "100.0.0." + target[1:]
+            self.send_probe(my_loopback, target_loopback, type=TYPE_SOURCEROUTING_SEG, recording=True)
     
     def share_lossy_stats(self):
         self.queue_to_meta.put(json.dumps(self.probes_counters()))
 
     def share_record_paths(self):
-        pass
+        with records_lock:
+            self.queue_to_meta.put(json.dumps(self.records))
 
     def probing_loop(self):
         while True:
-            #self.probing_topology(only_direct_link=False)
-            #self.probing_topology(only_direct_link=True)
-            self.send_probe("100.0.0.1", "100.0.0.2", type=1, recording=True)
+            self.probing_direct_link()
+            #self.probing_paths()
             time.sleep(self.probing_period)
 
     def sniffing_digest_loop(self):
@@ -380,7 +377,20 @@ class RoutingController(object):
 
         while True:
             msg = sub.recv()
-            self.parse_records(msg)
+            topic, device_id, ctx_id, list_id, buffer_id, num = struct.unpack("<iQiiQi", msg[:32])
+
+            self.controller.client.bm_learning_ack_buffer(ctx_id, list_id, buffer_id)
+
+            digest_payload= struct.unpack(">16iii", msg[32:104])
+            origin = str(ipaddress.IPv4Address(digest_payload[16]))
+            target = str(ipaddress.IPv4Address(digest_payload[17]))
+            record = [str(ipaddress.IPv4Address(r)) for r in digest_payload[:16][::-1] if r != 0];
+            print(origin, target, record)
+            with records_lock:
+                self.records[target] = record
+
+            self.controller.client.bm_learning_ack_buffer(ctx_id, list_id, buffer_id)
+
 
     def main_loop(self):
         while True:
