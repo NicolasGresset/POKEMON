@@ -1,6 +1,6 @@
 # POKEMON
 
-Ce [repository](https://github.com/NicolasGresset/POKEMON) contient le code pour le projet POKEMON de Nicolas Gresset-Bourgeois et Matthieu Ferreira--Rivier.
+Ce [repository](https://github.com/NicolasGresset/POKEMON) contient le code pour le projet POKEMON de Nicolas Gresset-Bourgeois et Matthieu Ferreira--Rivier. Il contient aussi le [rendu au format pdf](./rendu.pdf).
 
 ## Structure
 
