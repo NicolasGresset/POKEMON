@@ -80,6 +80,17 @@ control MyIngress(inout headers hdr,
             hdr.records[0].bottom = 0;
     }
 
+    action copy_to_digest() {
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[0].id) << 32 * 0; 
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[1].id) << 32 * 1;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[2].id) << 32 * 2;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[3].id) << 32 * 3;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[4].id) << 32 * 4;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[5].id) << 32 * 5;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[6].id) << 32 * 6;
+        meta.digest_records = ((bit<_32MAX_HOP>)hdr.records[7].id) << 32 * 7;
+    }
+
 
 #ifdef LOSSY_ROUTER
     action lossy_logic(){
@@ -220,6 +231,9 @@ control MyIngress(inout headers hdr,
                 }
                 else {
                     count_incoming_probes.apply();
+                    if(hdr.probe.recording == 1)
+                        copy_to_digest();
+                        digest(1, meta.digest_records);
                 }
             }
             if(meta.probe_id == hdr.probe.target)

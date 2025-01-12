@@ -154,7 +154,7 @@ class RoutingController(object):
 
                         host_ip = self.topo.get_host_ip(host) + "/24"
                         sw_port = self.topo.node_to_node_port_num(
-                       this is the direct counter for table     self.switch_name, next_hop
+                            self.switch_name, next_hop
                         )
                         dst_sw_mac = self.topo.node_to_node_mac(
                             next_hop, self.switch_name

@@ -15,6 +15,7 @@ const bit<1> TYPE_SOURCEROUTING_LINK = 0;
 const bit<1> TYPE_SOURCEROUTING_SEG = 1;
 
 #define MAX_HOP 16
+#define _32MAX_HOP 512
 
 /**
 * @brief encapsulation headers to impose intermediate nodes of passage for 
@@ -92,6 +93,7 @@ header tcp_t{
 }
 
 struct metadata {
+    bit<_32MAX_HOP> digest_records;
     ip4Addr_t probe_id;
     ip4Addr_t ipv4_target;
     bit<14> ecmp_hash;
