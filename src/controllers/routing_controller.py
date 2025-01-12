@@ -342,6 +342,8 @@ class RoutingController(object):
 
         my_loopback = "100.0.0." + self.switch_name[1:]
         for switch in switches:
+            if (switch == self.switch_name):
+                continue
             switch_loopback = "100.0.0." + switch[1:]
             self.send_probe(my_loopback, switch_loopback, recording=True)
 
