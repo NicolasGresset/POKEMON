@@ -322,8 +322,6 @@ class RoutingController(object):
 
     def send_probe(self):
         """This function send lossy testing probes and must be called periodically"""
-        if self.switch_name == "s2":
-            return
 
         neighbors = self.topo.get_switches_connected_to(self.switch_name)
         my_loopback = "100.0.0." + self.switch_name[1:]

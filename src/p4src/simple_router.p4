@@ -57,6 +57,11 @@ control MyIngress(inout headers hdr,
     }
     
     action pop_segment() {
+        # Update etherType when last segment is pop
+        if(hdr.sourcerouting.bottom == 1){
+            hdr.ethernet.etherType = TYPE_IPV4;
+        }
+
         hdr.sourcerouting.setInvalid();
     }
 
