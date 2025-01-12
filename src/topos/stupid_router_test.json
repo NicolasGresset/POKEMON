@@ -20,10 +20,6 @@
             [
                 "h4",
                 "s1"
-            ],
-            [
-                "s1",
-                "s2"
             ]
         ],
         "hosts": {
@@ -34,11 +30,7 @@
         },
         "switches": {
             "s1": {
-                "p4_src": "p4src/simple_router.p4",
-                "cpu_port": true
-            },
-            "s2": {
-                "p4_src": "p4src/simple_router.p4",
+                "p4_src": "p4src/simple_router_stupid.p4",
                 "cpu_port": true
             }
         }

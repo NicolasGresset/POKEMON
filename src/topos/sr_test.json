@@ -1,0 +1,52 @@
+{
+    "cli": true,
+    "pcap_dump": true,
+    "enable_log": true,
+    "topology": {
+        "assignment_strategy": "l2",
+        "links": [
+            [
+                "s1",
+                "s2"
+            ],
+            [
+                "s1",
+                "s4"
+            ],
+            [
+                "s4",
+                "s5"
+            ],
+            [
+                "s2",
+                "s3"
+            ],
+            [
+                "s3",
+                "s5"
+            ]
+        ],
+        "switches": {
+            "s1": {
+                "p4_src": "p4src/simple_router.p4",
+                "cpu_port": true
+            },
+            "s2": {
+                "p4_src": "p4src/simple_router.p4",
+                "cpu_port": true
+            },
+            "s3": {
+                "p4_src": "p4src/simple_router.p4",
+                "cpu_port": true
+            },
+            "s4": {
+                "p4_src": "p4src/simple_router.p4",
+                "cpu_port": true
+            },
+            "s5": {
+                "p4_src": "p4src/simple_router.p4",
+                "cpu_port": true
+            }
+        }
+    }
+}

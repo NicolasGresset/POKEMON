@@ -1,0 +1,28 @@
+{
+    "cli": true,
+    "pcap_dump": true,
+    "enable_log": true,
+    "topology": {
+        "assignment_strategy": "l2",
+        "links": [
+            [
+                "h1",
+                "s1"
+            ],
+            [
+                "h2",
+                "s1"
+            ]
+        ],
+        "hosts": {
+            "h1": {},
+            "h2": {}
+        },
+        "switches": {
+            "s1": {
+                "p4_src": "p4src/simple_router_loss.p4",
+                "cpu_port": true
+            }
+        }
+    }
+}

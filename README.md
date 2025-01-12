@@ -1,50 +1,41 @@
 # POKEMON
 
-## remarques de M. Luttringer
+Ce [repository](https://github.com/NicolasGresset/POKEMON) contient le code pour le projet POKEMON de Nicolas Gresset-Bourgeois et Matthieu Ferreira--Rivier.
 
-c'est possible de créer un unique controlleur qui implémente dans des threads séparés les fonctionnalités du méta-controleur et des controlleurs liés à chaque switch
+## Structure
 
-## run the system
+```
+└── src
+    ├── controllers : les différents contrôleurs Python utilisés
+    ├── helper      : des helpers pour générer des topologies
+    ├── log         : dossier contenant les logs des switchs p4
+    ├── p4src       : fichier sources p4
+    ├── pcap        : enregistrements pcap des switchs p4
+    └── topos       : topologies utilisées pour les tests
+```
+
+## Lancer un scénario de test
 
 ```bash
 ./run.sh
+cd home/src
 ```
 
-You can create a random topology using 
+Toutes les topologies sont présentes dans `src/topos`
+
 
 ```bash
-python topology_generator.py --output_name 40-switches.json --topo random -n 40 -d 4
+sudo p4run --config topos/stupid_router_test.json
 ```
 
-(it creates a random topology with 40 switches and an average degree of 4)
-
-and then start it with :
-
-```bash
-sudo p4run --config 40-switches.json
-```
-
-In another terminal attach to the container to run the controller,
+Dans un autre terminal, récupérer une session bash au conteneur pour lancer le contrôleur
 
 ```bash
 docker exec -it p4 bash
+cd home/src
+python3 controllers/meta_controller.py topos/stupid_router_test.json
 ```
 
-```bash
-python3 routing-controller.py
-```
+Il FAUT passer la même topologie en paramètre au méta-contrôleur.
 
-# code style
-
-for improving consistencies in formatting, use black to ensure formatting before each commit :
-
-```bash
-sudo pacman -Syu python-black python-pre-commit
-```
-
-do
-```bash
-black .
-```
-
-before each commit
+Le méta-contrôleur lance automatiquement tous les contrôleurs de chaque switch.
