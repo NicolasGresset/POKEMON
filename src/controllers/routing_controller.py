@@ -367,12 +367,6 @@ class RoutingController(object):
         sub.setsockopt(nnpy.SUB, nnpy.SUB_SUBSCRIBE, "")
 
         while True:
-            print(
-                "ENtering probing_loop ---------------------------------------------------"
-            )
-            # self.send_probe("100.0.0.1", "100.0.0.2", True)
-            # self.send_probe("100.0.0.2", "100.0.0.1", True)
-
             msg = sub.recv()
             # implement logic when receiving packets
             hexdump = binascii.hexlify(msg).decode(

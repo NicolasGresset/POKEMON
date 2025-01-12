@@ -38,7 +38,7 @@ class MetaController(cmd.Cmd):
         self.reset_states()
 
     def read_register_on(self, switch_id, register_name: str, index: int) -> int | list:
-        return switch_id.register_read(register_name, index)
+        return switch_id.register_read(register_name, index, show=False)
 
     def write_register_on(
         self, switch_id, register_name: str, index: int, value: int
