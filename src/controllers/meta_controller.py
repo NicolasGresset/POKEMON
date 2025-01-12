@@ -7,7 +7,7 @@ import queue
 import sys
 import json
 import cmd
-import time
+import time, io
 
 
 class MetaController(cmd.Cmd):
@@ -16,7 +16,7 @@ class MetaController(cmd.Cmd):
         super().__init__()
         self.prompt = ">>>"
         self.topo = load_topo("topology.json")
-        self.controllers = {}
+        self.switches = self.topo.get_p4switches()
         self.queues_from_meta = queues_from_meta
         self.queues_to_meta = queues_to_meta
 
@@ -30,12 +30,7 @@ class MetaController(cmd.Cmd):
             10  # number of seconds between each value retrieving process
         )
 
-        self.init()
         self.retrieve_stats_thread.start()
-
-    def init(self):
-        self.connect_to_switches()
-        self.reset_states()
 
     def read_register_on(self, switch_id, register_name: str, index: int) -> int | list:
         return switch_id.register_read(register_name, index, show=False)
@@ -52,14 +47,6 @@ class MetaController(cmd.Cmd):
     # def remove_entry_on(self, switch_id, table_name : str, entry : int):
     #     switch_id.table_delete(table_name, entry_handle, quiet=False)
 
-    def reset_states(self):
-        [controller.reset_state() for controller in self.controllers.values()]
-
-    def connect_to_switches(self):
-        for p4switch in self.topo.get_p4switches():
-            thrift_port = self.topo.get_thrift_port(p4switch)
-            self.controllers[p4switch] = SimpleSwitchThriftAPI(thrift_port)
-
     def do_ask_lossy_rates(self, args):
         """Ask all controllers to publish their stats about losses"""
         self.display_lossy_rates()
@@ -70,7 +57,7 @@ class MetaController(cmd.Cmd):
         pass
 
     def display_lossy_rates(self):
-        for sw_name, controller in self.controllers.items():
+        for sw_name in self.switches:
             dico = json.loads(self.lossy_rates[sw_name])
             print(f"Rates of {sw_name} : ")
             for sw_dst, tuples in dico.items():
@@ -80,10 +67,10 @@ class MetaController(cmd.Cmd):
             print("")
 
     def retrieve_stats(self, sonde_kind):
-        for sw_name, controller in self.controllers.items():
+        for sw_name in self.switches:
             self.queues_from_meta[sw_name].put(sonde_kind)
         
-        for sw_name, controller in self.controllers.items():
+        for sw_name in self.switches:
             if sonde_kind == self.ask_lossy_rate_message:
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
             elif sonde_kind == self.ask_shortest_path_stats:
