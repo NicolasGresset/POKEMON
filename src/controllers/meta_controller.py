@@ -54,8 +54,10 @@ class MetaController:
             self.print(f"Paths of {sw_name}")
             self.print(f"{'dest':<15}{'paths':<65}")
             for sw_dst, paths in dico.items():
-                paths_string = ",".join(paths)
-                self.print(f"{sw_dst:<15}{paths_string:<65}")
+                sw_dst_transformed = "s" + sw_dst.split(".")[-1]
+                paths_transformed = list(map(lambda elem : "s"+ elem.split(".")[-1], paths))
+                paths_string = ",".join(paths_transformed)
+                self.print(f"{sw_dst_transformed:<15}{paths_string:<65}")
             self.print("")
 
     def display_lossy_rates(self):
@@ -65,14 +67,15 @@ class MetaController:
             self.print(f"Rates of {sw_name} : ")
             self.print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
             for sw_dst, tuples in dico.items():
+                sw_dst_transformed = "s" + sw_dst.split(".")[-1]
                 ratio = tuples[1] / tuples[0] if tuples[0] != 0 else 0
                 if ratio != 1 and tuples[0] != 0:
-                    self.print("\033[31m")
+                    self.print("\033[31m", end='')
             
-                self.print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
+                self.print(f"{sw_dst_transformed:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
 
                 if ratio != 1 and tuples[0] != 0:
-                    self.print("\033[0m")
+                    self.print("\033[0m", end='')
             self.print("")
 
     def retrieve_stats(self, sonde_kind):
