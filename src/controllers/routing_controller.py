@@ -1,4 +1,5 @@
-import json, logging, struct, ipaddress
+import sys, io, json, logging, struct, ipaddress, threading, time
+import nnpy
 from p4utils.utils.helper import load_topo
 from p4utils.utils.sswitch_thrift_API import SimpleSwitchThriftAPI
 from scapy.all import sendp
@@ -12,9 +13,6 @@ from POKEMON_utils.headers import (
     TYPE_SOURCEROUTING_LINK,
     TYPE_SOURCEROUTING_SEG,
 )
-import threading
-import time
-import nnpy
 
 records_lock = threading.Lock()
 
@@ -70,7 +68,6 @@ class RoutingController(object):
         # sw_name = nom du switch d'intérêt
         # controller = nom du controlleur associé à ce switch
         for sw_dst in self.topo.get_p4switches():
-            print("NAME:",sw_dst)
 
             # if its ourselves we create direct connections
             if self.switch_name == sw_dst:
@@ -349,7 +346,6 @@ class RoutingController(object):
         for target in self.topo.get_p4switches():
             if(target == self.switch_name):
                 continue
-            print(self.switch_name, target)
             target_loopback = "100.0.0." + target[1:]
             self.send_probe(my_loopback, target_loopback, type=TYPE_SOURCEROUTING_SEG, recording=True)
     
@@ -362,8 +358,8 @@ class RoutingController(object):
 
     def probing_loop(self):
         while True:
-            self.probing_direct_link()
-            #self.probing_paths()
+            #self.probing_direct_link()
+            self.probing_paths()
             time.sleep(self.probing_period)
 
     def sniffing_digest_loop(self):
@@ -379,16 +375,17 @@ class RoutingController(object):
             msg = sub.recv()
             topic, device_id, ctx_id, list_id, buffer_id, num = struct.unpack("<iQiiQi", msg[:32])
 
-            self.controller.client.bm_learning_ack_buffer(ctx_id, list_id, buffer_id)
-
-            digest_payload= struct.unpack(">16iii", msg[32:104])
-            origin = str(ipaddress.IPv4Address(digest_payload[16]))
-            target = str(ipaddress.IPv4Address(digest_payload[17]))
-            record = [str(ipaddress.IPv4Address(r)) for r in digest_payload[:16][::-1] if r != 0];
-            print(origin, target, record)
-            with records_lock:
-                self.records[target] = record
-
+            off = 32
+            while off < len(msg):
+                digest_payload= struct.unpack(">16iii", msg[off:(off+72)])
+                off += 72
+                origin = str(ipaddress.IPv4Address(digest_payload[16]))
+                target = str(ipaddress.IPv4Address(digest_payload[17]))
+                record = [str(ipaddress.IPv4Address(r)) for r in digest_payload[:16][::-1] if r != 0];
+        
+                with records_lock:
+                    self.records[target] = record
+            
             self.controller.client.bm_learning_ack_buffer(ctx_id, list_id, buffer_id)
 
 

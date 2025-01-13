@@ -69,6 +69,7 @@ class MetaController(cmd.Cmd):
             print("")
 
 
+
     def display_lossy_rates(self):
         for sw_name in self.switches:
             dico = json.loads(self.lossy_rates[sw_name])
@@ -93,7 +94,7 @@ class MetaController(cmd.Cmd):
         """Ask all controllers to share stats each retrieve_stat_period seconds"""
         while True:
             self.retrieve_stats(self.ask_lossy_rate_message)
-            # self.retrieve_stats(self.ask_shortest_path_stats)
+            self.retrieve_stats(self.ask_shortest_path_stats)
             time.sleep(self.retrieve_stats_period)
 
     def do_exit(self, arg):
