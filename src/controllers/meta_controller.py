@@ -10,7 +10,7 @@ import cmd
 import time, io
 
 
-class MetaController(cmd.Cmd):
+class MetaController:
 
     def __init__(self, queues_from_meta, queues_to_meta):
         super().__init__()
@@ -48,42 +48,31 @@ class MetaController(cmd.Cmd):
     # def remove_entry_on(self, switch_id, table_name : str, entry : int):
     #     switch_id.table_delete(table_name, entry_handle, quiet=False)
 
-    def do_ask_lossy_rates(self, args):
-        """Ask all controllers to publish their stats about losses"""
-        self.display_lossy_rates()
-
-    def do_ask_shortest_paths_stats(self, args):
-        """Ask all controllers to publish their stats about shortest path stats"""
-        # display stats about shortest paths
-        self.display_shortest_paths()
-
-
     def display_shortest_paths(self):
+        self.print("displaying shortest paths")
         for sw_name in self.switches:
             dico = json.loads(self.shortest_paths[sw_name])
-            print(f"Paths of {sw_name}")
-            print(f"{'dest':<15}{'paths':<65}")
+            self.print(f"Paths of {sw_name}")
+            self.print(f"{'dest':<15}{'paths':<65}")
             for sw_dst, paths in dico.items():
                 paths_string = ",".join(paths)
-                print(f"{sw_dst:<15}{paths_string:<65}")
-            print("")
-
-
+                self.print(f"{sw_dst:<15}{paths_string:<65}")
+            self.print("")
 
     def display_lossy_rates(self):
         for sw_name in self.switches:
             dico = json.loads(self.lossy_rates[sw_name])
-            print(f"Rates of {sw_name} : ")
+            self.print(f"Rates of {sw_name} : ")
             for sw_dst, tuples in dico.items():
                 ratio = tuples[1] / tuples[0] if tuples[0] != 0 else 0
-                print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
-                print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
-            print("")
+                self.print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
+                self.print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
+            self.print("")
 
     def retrieve_stats(self, sonde_kind):
         for sw_name in self.switches:
             self.queues_from_meta[sw_name].put(sonde_kind)
-        
+
         for sw_name in self.switches:
             if sonde_kind == self.ask_lossy_rate_message:
                 self.lossy_rates[sw_name] = self.queues_to_meta[sw_name].get()
@@ -97,15 +86,27 @@ class MetaController(cmd.Cmd):
             self.retrieve_stats(self.ask_shortest_path_stats)
             time.sleep(self.retrieve_stats_period)
 
-    def do_exit(self, arg):
-        """Exit the shell"""
+    def print(self, *args, **kwargs):
+        """Utiliser sys.__stdout__ pour les affichages explicites"""
+        print(*args, file=sys.__stdout__, **kwargs)
+    
+    def listen_user_input_loop(self):
+        while True:
+            self.print(">>>")
+            user_input=input()
+            if user_input == "":
+                continue
+            elif user_input == "h" or user_input == "help":
+                self.print("Available commands : \nhelp (h)\nask_lossy_rates (l)\nask_shortest_paths_stats (s)")
+            elif user_input == "ask_lossy_rates" or user_input == "l":
+                self.display_lossy_rates()
+            elif user_input == "ask_shortest_paths_stats" or user_input == "s":
+                self.display_shortest_paths()
+            else:
+                self.print("Unrecognized command, type help for available commands")
 
-        print("Goodbye!")
-        return True
+            
 
-    def emptyline(self):
-        # Overriding emptyline to do nothing when Enter is pressed
-        pass
 
 
 def get_switches_from_topo(config_path: str):
@@ -119,7 +120,6 @@ def get_switches_from_topo(config_path: str):
 
 def main(config_path: str):
     switches = get_switches_from_topo(config_path)
-    print("-------------------------------------------\n", switches)
 
     threads = []
 
@@ -127,8 +127,6 @@ def main(config_path: str):
     queues_to_meta = {}
 
     for switch, details in switches.items():
-        print("\n---------------------------------------------------------------------")
-        print("Starting a thread for", switch)
         p4_file = details.get("p4_src")
         queues_from_meta[switch] = queue.Queue()
         queues_to_meta[switch] = queue.Queue()
@@ -163,9 +161,9 @@ def main(config_path: str):
         thread.start()
 
     meta_controller_thread = threading.Thread(
-        target=lambda: MetaController(queues_from_meta, queues_to_meta).cmdloop(
-            "Welcome to the meta controller shell. Type 'help' for commands."
-        )
+        target=lambda: MetaController(
+            queues_from_meta, queues_to_meta
+        ).listen_user_input_loop()
     )
     threads.append(meta_controller_thread)
     meta_controller_thread.start()

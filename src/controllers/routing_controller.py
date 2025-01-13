@@ -19,6 +19,7 @@ records_lock = threading.Lock()
 class RoutingController(object):
 
     def __init__(self, switch_name: str, queue_from_meta, queue_to_meta):
+        sys.stdout = io.StringIO()
         logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
         self.topo = load_topo("topology.json")
         self.switch_name: str = switch_name
@@ -329,7 +330,7 @@ class RoutingController(object):
         )
         packet = ether / segment1 / segment2 / ip / probe
         logging.debug(str(packet))
-        sendp(packet, iface=self.controller_cpu_port)
+        sendp(packet, iface=self.controller_cpu_port, verbose=False)
 
     def probing_direct_link(self):
         "Send a probe to all neighbor routers"
@@ -358,7 +359,7 @@ class RoutingController(object):
 
     def probing_loop(self):
         while True:
-            #self.probing_direct_link()
+            self.probing_direct_link()
             self.probing_paths()
             time.sleep(self.probing_period)
 
