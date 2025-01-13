@@ -49,7 +49,6 @@ class MetaController:
     #     switch_id.table_delete(table_name, entry_handle, quiet=False)
 
     def display_shortest_paths(self):
-        self.print("displaying shortest paths")
         for sw_name in self.switches:
             dico = json.loads(self.shortest_paths[sw_name])
             self.print(f"Paths of {sw_name}")
@@ -62,11 +61,18 @@ class MetaController:
     def display_lossy_rates(self):
         for sw_name in self.switches:
             dico = json.loads(self.lossy_rates[sw_name])
+            self.print("-"*60)
             self.print(f"Rates of {sw_name} : ")
+            self.print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
             for sw_dst, tuples in dico.items():
                 ratio = tuples[1] / tuples[0] if tuples[0] != 0 else 0
-                self.print(f"{'dest':<15}{'outgoing':<15}{'incoming':<15}{'ratio':<15}")
+                if ratio != 1 and tuples[0] != 0:
+                    self.print("\033[31m")
+            
                 self.print(f"{sw_dst:<15}{tuples[0]:<15}{tuples[1]:<15}{ratio:<15}")
+
+                if ratio != 1 and tuples[0] != 0:
+                    self.print("\033[0m")
             self.print("")
 
     def retrieve_stats(self, sonde_kind):
